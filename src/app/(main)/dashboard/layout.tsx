@@ -144,7 +144,7 @@ export default function DashboardLayout({
       <aside
         id="sidebar-nav"
         ref={sidebarRef}
-        className={`fixed lg:static top-0 left-0 h-full lg:h-auto z-40 lg:z-auto w-64 flex-shrink-0 bg-dark-card border-r border-dark-border p-4
+        className={`fixed lg:static top-0 left-0 h-full lg:h-auto z-40 lg:z-auto w-64 flex-shrink-0 bg-dark-card border-r border-dark-border p-4 overflow-y-auto scrollbar-app
                     transform transition-transform duration-300 ease-in-out
                     ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
                     lg:translate-x-0`}
@@ -205,7 +205,7 @@ export default function DashboardLayout({
         </nav>
       </aside>
 
-      <main className="flex-grow p-6 md:p-8 overflow-auto lg:ml-[-256px]">
+      <main className="flex-grow p-6 md:p-8 overflow-auto lg:ml-[-256px] scrollbar-app">
         <div className="lg:ml-64">{children}</div>
       </main>
     </div>

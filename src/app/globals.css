@@ -97,6 +97,71 @@ body {
   animation: zoom-in-95 200ms ease-out;
 }
 
+/* Botão Compartilhar ativo: pulsante + light sweep estilo pêndulo */
+@keyframes share-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4), 0 10px 15px -3px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.15), 0 10px 15px -3px rgba(245, 158, 11, 0.3);
+  }
+}
+
+@keyframes share-sweep {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-share-pulse {
+  animation: share-pulse 2s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-share-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: share-sweep 2.5s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Card selecionado: brilho laranja forte nas bordas + leve pulsação */
+@keyframes selected-card-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(238, 77, 45, 0.95),
+      0 0 20px 2px rgba(238, 77, 45, 0.65),
+      0 0 40px 4px rgba(238, 77, 45, 0.45),
+      0 0 60px 8px rgba(238, 77, 45, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(238, 77, 45, 1),
+      0 0 28px 4px rgba(238, 77, 45, 0.7),
+      0 0 50px 8px rgba(238, 77, 45, 0.5),
+      0 0 75px 12px rgba(238, 77, 45, 0.3);
+  }
+}
+
+.shadow-selected-card {
+  animation: selected-card-glow 2.2s ease-in-out infinite;
+}
+
 /* Melhoria visual nos dropdowns - scrollbar customizado */
 select::-webkit-scrollbar {
   width: 8px;
@@ -114,4 +179,99 @@ select::-webkit-scrollbar-thumb {
 
 select::-webkit-scrollbar-thumb:hover {
   background: var(--color-shopee-orange);
+}
+
+/* Scrollbar igual à barra lateral do app: trilho branco, thumb cinza, setas */
+.scrollbar-app {
+  scrollbar-width: thin;
+  scrollbar-color: #71717a #ffffff;
+}
+
+.scrollbar-app::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.scrollbar-app::-webkit-scrollbar-track {
+  background: #ffffff;
+  border-radius: 0;
+}
+
+.scrollbar-app::-webkit-scrollbar-thumb {
+  background: #71717a;
+  border-radius: 6px;
+  border: 2px solid #ffffff;
+}
+
+.scrollbar-app::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+.scrollbar-app::-webkit-scrollbar-button {
+  display: block;
+  height: 12px;
+  width: 12px;
+  background: #71717a;
+  border: 1px solid #ffffff;
+}
+
+.scrollbar-app::-webkit-scrollbar-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 4L2 8h8L6 4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.scrollbar-app::-webkit-scrollbar-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 8l4-4H2l4 4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Scrollbar Gerador de Links Shopee: preto + laranja (estilo do app) */
+.scrollbar-shopee {
+  scrollbar-width: thin;
+  scrollbar-color: #EE4D2D #18181B;
+}
+
+.scrollbar-shopee::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scrollbar-shopee::-webkit-scrollbar-track {
+  background: #18181B;
+  border-radius: 6px;
+  border-left: 1px solid rgba(238, 77, 45, 0.25);
+}
+
+.scrollbar-shopee::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #27272A 0%, #3f3f46 100%);
+  border-radius: 6px;
+  border: 1px solid rgba(238, 77, 45, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.scrollbar-shopee::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #EE4D2D 0%, #f97316 100%);
+  border-color: rgba(238, 77, 45, 0.8);
+}
+
+.scrollbar-shopee::-webkit-scrollbar-button {
+  display: block;
+  height: 10px;
+  width: 10px;
+  background: #18181B;
+  border: 1px solid rgba(238, 77, 45, 0.35);
+}
+
+.scrollbar-shopee::-webkit-scrollbar-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23EE4D2D' d='M6 4L2 8h8L6 4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.scrollbar-shopee::-webkit-scrollbar-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23EE4D2D' d='M6 8l4-4H2l4 4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }

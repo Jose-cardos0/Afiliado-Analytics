@@ -14,6 +14,11 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ImageIcon,
+  Share2,
+  Copy,
+  MessageCircle,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -79,8 +84,14 @@ export default function GeradorLinksShopeePage() {
   const [subId1, setSubId1] = useState("");
   const [subId2, setSubId2] = useState("");
   const [subId3, setSubId3] = useState("");
-  const [observation, setObservation] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
+  const [lastGeneratedLink, setLastGeneratedLink] = useState("");
+  const [storyCaption, setStoryCaption] = useState("");
+  const [captionLoading, setCaptionLoading] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState("");
+  const [generatedStoryImage, setGeneratedStoryImage] = useState<string | null>(null);
+  const [storyImageLoading, setStoryImageLoading] = useState(false);
+  const [storyImageUseGenerated, setStoryImageUseGenerated] = useState(false);
   const [convertLoading, setConvertLoading] = useState(false);
   const [products, setProducts] = useState<ProductOffer[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductOffer | null>(null);
@@ -182,9 +193,15 @@ export default function GeradorLinksShopeePage() {
             const similarData = await similarRes.json();
             const similar = (similarData?.products ?? []) as ProductOffer[];
             const currentRate = list[0].commissionRate ?? 0;
-            const sameNiche = similar
+            let sameNiche = similar
               .filter((p) => p.itemId !== list[0].itemId && (p.commissionRate ?? 0) >= currentRate)
               .sort((a, b) => (b.commissionRate ?? 0) - (a.commissionRate ?? 0));
+            if (sameNiche.length === 0) {
+              sameNiche = similar
+                .filter((p) => p.itemId !== list[0].itemId)
+                .sort((a, b) => (b.commissionRate ?? 0) - (a.commissionRate ?? 0))
+                .slice(0, 5);
+            }
             setGoldenProducts(sameNiche);
           }
         }
@@ -193,6 +210,8 @@ export default function GeradorLinksShopeePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error ?? "Erro ao buscar produtos");
         setProducts((data?.products ?? []) as ProductOffer[]);
+        setSelectedProduct(null);
+        setGoldenProducts([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao buscar");
@@ -202,6 +221,13 @@ export default function GeradorLinksShopeePage() {
   }, [inputValue, hasApiKeys]);
 
   handleSearchRef.current = handleSearch;
+
+  useEffect(() => {
+    setGeneratedStoryImage(null);
+    setStoryImageUseGenerated(false);
+    setLastGeneratedLink("");
+    setStoryCaption("");
+  }, [selectedProduct?.itemId]);
 
   const handleSelectProduct = useCallback(async (product: ProductOffer) => {
     setSelectedProduct(product);
@@ -214,12 +240,18 @@ export default function GeradorLinksShopeePage() {
         const data = await res.json();
         const similar = (data?.products ?? []) as ProductOffer[];
         const currentRate = product.commissionRate ?? 0;
-        const sameNiche = similar
+        let sameNiche = similar
           .filter((p) => p.itemId !== product.itemId && (p.commissionRate ?? 0) >= currentRate)
           .sort((a, b) => (b.commissionRate ?? 0) - (a.commissionRate ?? 0));
+        if (sameNiche.length === 0) {
+          sameNiche = similar
+            .filter((p) => p.itemId !== product.itemId)
+            .sort((a, b) => (b.commissionRate ?? 0) - (a.commissionRate ?? 0))
+            .slice(0, 5);
+        }
         setGoldenProducts(sameNiche);
       } catch {
-        //
+        setGoldenProducts([]);
       }
     }
   }, []);
@@ -252,7 +284,7 @@ export default function GeradorLinksShopeePage() {
           subId1: subIds[0] ?? "",
           subId2: subIds[1] ?? "",
           subId3: subIds[2] ?? "",
-          observation,
+          observation: "",
           productName: selectedProduct?.productName ?? "",
           slug,
           imageUrl: selectedProduct?.imageUrl ?? "",
@@ -264,13 +296,14 @@ export default function GeradorLinksShopeePage() {
         const err = await postRes.json().catch(() => ({}));
         throw new Error(err?.error ?? "Erro ao salvar no histórico");
       }
+      setLastGeneratedLink(shortLink);
       await loadHistory(1, historySearchDebounced);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao converter");
     } finally {
       setConvertLoading(false);
     }
-  }, [selectedProduct, inputValue, subId1, subId2, subId3, observation, historySearchDebounced, loadHistory]);
+  }, [selectedProduct, inputValue, subId1, subId2, subId3, historySearchDebounced, loadHistory]);
 
   const runSearchNow = useCallback(() => {
     if (debounceRef.current) {
@@ -279,6 +312,171 @@ export default function GeradorLinksShopeePage() {
     }
     handleSearch();
   }, [handleSearch]);
+
+  const handleGenerateStoryImage = useCallback(async () => {
+    if (!selectedProduct?.imageUrl) return;
+    setStoryImageLoading(true);
+    setGeneratedStoryImage(null);
+    setStoryImageUseGenerated(false);
+    try {
+      const res = await fetch("/api/shopee/generate-story-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: selectedProduct.imageUrl,
+          productName: selectedProduct.productName ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Erro ao gerar imagem");
+      const dataUrl = data?.imageBase64
+        ? `data:image/png;base64,${data.imageBase64}`
+        : data?.imageUrl ?? null;
+      setGeneratedStoryImage(dataUrl);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar imagem");
+    } finally {
+      setStoryImageLoading(false);
+    }
+  }, [selectedProduct]);
+
+  const handleGenerateCaption = useCallback(async () => {
+    if (!selectedProduct?.productName) return;
+    setCaptionLoading(true);
+    setShareFeedback("");
+    try {
+      const res = await fetch("/api/shopee/generate-caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productName: selectedProduct.productName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Erro ao gerar legenda");
+      setStoryCaption(data?.caption ?? "");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar legenda");
+    } finally {
+      setCaptionLoading(false);
+    }
+  }, [selectedProduct]);
+
+  const handleShareStory = useCallback(async () => {
+    const link = lastGeneratedLink;
+    if (!link) {
+      setShareFeedback("Converta o link antes (botão \"Converter Link\") para copiar o link com seus Sub IDs.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      setShareFeedback("Link copiado! Abra o Instagram → Stories → adicione a imagem → sticker \"Adicionar link\" → cole o link. Adicione uma música viral no Story.");
+      setTimeout(() => setShareFeedback(""), 8000);
+      if (typeof window !== "undefined") {
+        window.open("https://www.instagram.com/", "_blank", "noopener");
+      }
+    } catch {
+      setShareFeedback("Copie o link manualmente e abra o Instagram.");
+    }
+  }, [lastGeneratedLink]);
+
+  const getSelectedImageFile = useCallback(async (): Promise<File | null> => {
+    const url = storyImageUseGenerated && generatedStoryImage
+      ? generatedStoryImage
+      : selectedProduct?.imageUrl;
+    if (!url) return null;
+    try {
+      if (url.startsWith("data:")) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return new File([blob], "story-shopee.jpg", { type: blob.type || "image/jpeg" });
+      }
+      const proxyUrl = `/api/shopee/proxy-image?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return new File([blob], "story-shopee.jpg", { type: blob.type || "image/jpeg" });
+    } catch {
+      return null;
+    }
+  }, [storyImageUseGenerated, generatedStoryImage, selectedProduct?.imageUrl]);
+
+  const [whatsappSharing, setWhatsappSharing] = useState(false);
+
+  const handleShareWhatsApp = useCallback(async () => {
+    if (!lastGeneratedLink) {
+      setShareFeedback("Converta o link antes (botão \"Converter Link\") para compartilhar no WhatsApp.");
+      return;
+    }
+    setWhatsappSharing(true);
+    const legenda = storyCaption.trim();
+    const link = lastGeneratedLink;
+    const textAsCaption = legenda ? (link ? `${legenda}\n\n${link}` : legenda) : link;
+    let shared = false;
+    try {
+      const imageFile = await getSelectedImageFile();
+      const canShare = typeof navigator !== "undefined" && navigator.share;
+      const canShareFiles = imageFile && (navigator as { canShare?: (x: { files?: File[] }) => boolean }).canShare?.({ files: [imageFile] });
+
+      if (canShare && canShareFiles) {
+        await navigator.share({
+          files: [imageFile],
+          text: textAsCaption,
+          title: "Story Shopee",
+        });
+        setShareFeedback("Imagem e legenda enviadas juntas! No WhatsApp escolha um contato para enviar ou \"Status\" para postar como story — a legenda e o link vão junto da imagem.");
+        setTimeout(() => setShareFeedback(""), 7000);
+        shared = true;
+      }
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") {
+        setShareFeedback("Compartilhar com imagem não disponível. Abrindo WhatsApp só com texto...");
+      }
+    }
+
+    if (!shared) {
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(textAsCaption)}`;
+      if (typeof window !== "undefined") window.open(waUrl, "_blank", "noopener");
+      setShareFeedback("WhatsApp abriu com a legenda e o link. Use \"Baixar imagem\" e anexe a imagem no chat ou no Status; a legenda já está no texto.");
+      setTimeout(() => setShareFeedback(""), 6000);
+    }
+    setWhatsappSharing(false);
+  }, [lastGeneratedLink, storyCaption, getSelectedImageFile]);
+
+  const handleDownloadStoryImage = useCallback(async () => {
+    const url = storyImageUseGenerated && generatedStoryImage
+      ? generatedStoryImage
+      : selectedProduct?.imageUrl;
+    if (!url) return;
+    const isDataUrl = typeof url === "string" && url.startsWith("data:");
+    try {
+      if (isDataUrl) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "story-shopee.jpg";
+        a.click();
+      } else {
+        const res = await fetch(url, { mode: "cors" });
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "story-shopee.jpg";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      setShareFeedback("Imagem baixada! Anexe no WhatsApp ou no Story do Instagram.");
+      setTimeout(() => setShareFeedback(""), 4000);
+    } catch {
+      if (!isDataUrl) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "story-shopee.jpg";
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.click();
+      }
+      setShareFeedback("Imagem aberta em nova aba. Salve com botão direito → Salvar imagem e anexe no WhatsApp.");
+      setTimeout(() => setShareFeedback(""), 5000);
+    }
+  }, [storyImageUseGenerated, generatedStoryImage, selectedProduct?.imageUrl]);
 
   const handleDeleteHistory = useCallback(
     async (id: string) => {
@@ -361,7 +559,7 @@ export default function GeradorLinksShopeePage() {
               )}
             </div>
             {products.length > 0 && (
-              <div className="mb-4 max-h-60 overflow-y-auto rounded-lg border border-dark-border bg-dark-bg p-2 space-y-2">
+              <div className="mb-4 max-h-60 overflow-y-auto rounded-lg border border-dark-border bg-dark-bg p-2 space-y-2 scrollbar-shopee">
                 {products.map((p) => (
                   <button
                     key={p.itemId}
@@ -417,20 +615,10 @@ export default function GeradorLinksShopeePage() {
                 />
               </div>
             </div>
-            <div className="mb-4">
-              <label className="block text-xs text-text-secondary mb-1">Observação (Opcional)</label>
-              <input
-                type="text"
-                value={observation}
-                onChange={(e) => setObservation(e.target.value)}
-                placeholder="Ex: Link para post do Instagram dia 15"
-                className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-bg text-text-primary text-sm placeholder-text-secondary/60 focus:outline-none focus:border-shopee-orange"
-              />
-            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={handleSearch}
+                onClick={() => handleSearch()}
                 disabled={searchLoading || !inputValue.trim() || !hasApiKeys}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-bg border border-dark-border text-text-primary font-medium hover:border-shopee-orange hover:text-shopee-orange disabled:opacity-50 transition-colors"
               >
@@ -456,8 +644,8 @@ export default function GeradorLinksShopeePage() {
           </div>
 
           {/* Visualização da Oferta */}
-          <div className="bg-dark-card rounded-xl border border-dark-border p-5">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">Visualização da Oferta</h2>
+          <div className="bg-dark-card rounded-xl border border-dark-border p-5 overflow-hidden flex flex-col">
+            <h2 className="text-lg font-semibold text-text-primary mb-4 flex-shrink-0">Visualização da Oferta</h2>
             {selectedProduct ? (
               <div className="space-y-4">
                 <div className="flex gap-4 p-3 rounded-lg border border-dark-border bg-dark-bg">
@@ -485,12 +673,12 @@ export default function GeradorLinksShopeePage() {
                   </div>
                 </div>
                 {goldenProducts.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1">
+                  <div className="min-h-0 flex flex-col">
+                    <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1 flex-shrink-0">
                       Oportunidades de Ouro
                       <span className="text-xs font-normal text-emerald-400">Maior Comissão</span>
                     </h3>
-                    <ul className="space-y-2 max-h-64 overflow-y-auto">
+                    <ul className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden scrollbar-shopee rounded-lg border border-dark-border bg-dark-bg/30 pr-1">
                       {goldenProducts.slice(0, 5).map((p) => (
                         <li key={p.itemId}>
                           <button
@@ -529,6 +717,165 @@ export default function GeradorLinksShopeePage() {
             )}
           </div>
         </div>
+
+        {/* Preparar para Stories */}
+        {selectedProduct && (
+          <div className="bg-dark-card rounded-xl border border-dark-border p-5 mb-8">
+            <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-shopee-orange" />
+              Preparar para Stories 
+            </h2>
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+              <div className="flex flex-col gap-3 flex-shrink-0">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-text-secondary font-medium">Imagem Shopee</p>
+                    <button
+                      type="button"
+                      onClick={() => setStoryImageUseGenerated(false)}
+                      className={`w-[160px] aspect-[9/16] rounded-xl overflow-hidden flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:ring-offset-2 focus:ring-offset-dark-card ${
+                        !storyImageUseGenerated
+                          ? "border-2 border-shopee-orange bg-dark-bg"
+                          : "border border-dark-border bg-dark-bg hover:border-shopee-orange/60"
+                      }`}
+                    >
+                      {selectedProduct.imageUrl ? (
+                        <img
+                          src={selectedProduct.imageUrl}
+                          alt="Produto"
+                          className="w-full h-full object-cover pointer-events-none"
+                        />
+                      ) : (
+                        <span className="text-text-secondary text-sm">Sem imagem</span>
+                      )}
+                    </button>
+                    {!storyImageUseGenerated && (
+                      <p className="text-xs text-shopee-orange font-medium">✓ Em uso no Story</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-text-secondary font-medium">Imagem IA</p>
+                    {storyImageLoading ? (
+                      <div className="w-[160px] aspect-[9/16] rounded-xl overflow-hidden border-2 border-dark-border bg-dark-bg flex items-center justify-center min-h-[284px]">
+                        <div className="flex flex-col items-center justify-center gap-2 text-text-secondary">
+                          <Loader2 className="h-8 w-8 animate-spin" />
+                          <span className="text-xs">Gerando...</span>
+                        </div>
+                      </div>
+                    ) : generatedStoryImage ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setStoryImageUseGenerated(true)}
+                          className={`w-[160px] aspect-[9/16] rounded-xl overflow-hidden flex items-center justify-center min-h-[284px] transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:ring-offset-2 focus:ring-offset-dark-card ${
+                            storyImageUseGenerated
+                              ? "border-2 border-shopee-orange bg-dark-bg"
+                              : "border border-dark-border bg-dark-bg hover:border-shopee-orange/60"
+                          }`}
+                        >
+                          <img
+                            src={generatedStoryImage}
+                            alt="Story gerada"
+                            className="w-full h-full object-cover pointer-events-none"
+                          />
+                        </button>
+                        {storyImageUseGenerated && (
+                          <p className="text-xs text-shopee-orange font-medium">✓ Em uso no Story</p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="w-[160px] aspect-[9/16] rounded-xl border-2 border-dashed border-dark-border bg-dark-bg flex items-center justify-center min-h-[284px]">
+                        <span className="text-text-secondary text-xs text-center px-2">Clique em &quot;Gerar Imagem&quot;</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateStoryImage}
+                    disabled={storyImageLoading || !selectedProduct?.imageUrl}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-bg border border-dark-border text-text-primary text-sm font-medium hover:border-shopee-orange hover:text-shopee-orange disabled:opacity-50 transition-colors"
+                  >
+                    {storyImageLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                    Gerar Imagem
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <label className="block text-sm text-text-secondary mb-1">Legenda para o Story</label>
+                <textarea
+                  value={storyCaption}
+                  onChange={(e) => setStoryCaption(e.target.value)}
+                  placeholder="Clique em &quot;Gerar legenda&quot; para criar uma legenda de venda com hashtags..."
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-bg text-text-primary text-sm placeholder-text-secondary/60 focus:outline-none focus:border-shopee-orange resize-y scrollbar-shopee"
+                />
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateCaption}
+                    disabled={captionLoading || !selectedProduct?.productName}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-shopee-orange text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {captionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Gerar legenda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareStory}
+                    disabled={!lastGeneratedLink}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      lastGeneratedLink
+                        ? "bg-amber-500 text-dark-bg border border-amber-400 shadow-lg shadow-amber-500/30 hover:brightness-110 animate-share-pulse cursor-pointer"
+                        : "bg-dark-border text-text-secondary border border-dark-border cursor-not-allowed opacity-70"
+                    }`}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Instagram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareWhatsApp}
+                    disabled={!lastGeneratedLink || whatsappSharing}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      lastGeneratedLink && !whatsappSharing
+                        ? "bg-emerald-600 text-white border border-emerald-500 hover:bg-emerald-500 cursor-pointer"
+                        : "bg-dark-border text-text-secondary border border-dark-border cursor-not-allowed opacity-70"
+                    }`}
+                  >
+                    {whatsappSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                    WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadStoryImage}
+                    disabled={!selectedProduct?.imageUrl && !generatedStoryImage}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-dark-border bg-dark-bg text-text-primary hover:border-shopee-orange hover:text-shopee-orange disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar imagem
+                  </button>
+                </div>
+                {!lastGeneratedLink && (
+                  <p className="mt-3 text-sm text-amber-200/90 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    Primeiro clique no Converter Link para copiar seu link customizado da oferta!
+                  </p>
+                )}
+                {shareFeedback && (
+                  <p className="mt-3 text-sm text-emerald-400 flex items-start gap-2">
+                    <Copy className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    {shareFeedback}
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-text-secondary">
+                  <strong>Instagram:</strong> o link é copiado e o app abre. Use o sticker &quot;Adicionar link&quot; no Story e cole. Adicione música pelo ícone de música. — <strong>WhatsApp:</strong> no celular envia a imagem e a legenda (com o link) juntas: escolha WhatsApp no menu e envie na conversa ou poste no Status; a legenda aparece como texto da imagem. No computador abre só o texto — use &quot;Baixar imagem&quot; para anexar.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Histórico de Links */}
         <div className="bg-dark-card rounded-xl border border-dark-border p-5">
