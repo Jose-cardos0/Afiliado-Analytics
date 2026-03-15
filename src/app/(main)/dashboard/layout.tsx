@@ -15,6 +15,7 @@ import {
   ShoppingBag,
   MessageCircle,
   ListChecks,
+  Film,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -70,6 +71,11 @@ const sidebarNavItems = [
     title: "Minha Lista de Ofertas",
     href: "/dashboard/minha-lista-ofertas",
     icon: <ListChecks className="h-5 w-5" />,
+  },
+  {
+    title: "Editor de Vídeo",
+    href: "/dashboard/video-editor",
+    icon: <Film className="h-5 w-5" />,
   },
 ];
 
