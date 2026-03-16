@@ -23,25 +23,33 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const productName = String(body?.productName ?? "").trim();
     const style = String(body?.style ?? "vendas").trim();
+    const videoDuration = Number(body?.videoDuration) || 0;
 
     if (!productName) {
       return NextResponse.json({ error: "productName é obrigatório" }, { status: 400 });
     }
 
+    const durationSec = Math.round(videoDuration);
+    const hasDuration = durationSec > 0;
+
+    const durationGuide = hasDuration
+      ? `- O vídeo tem ${durationSec} segundos. A narração DEVE caber em ${durationSec} segundos quando falada em velocidade normal (~2.5 palavras por segundo). Isso significa no máximo ~${Math.round(durationSec * 2.5)} palavras.`
+      : `- Linguagem falada, como se fosse uma narração de vídeo curto (30-60s).\n- Máximo 200 palavras.`;
+
     const systemPrompt = `Você é um copywriter expert em e-commerce e vídeos de venda para redes sociais. Gere uma narração/copy em português do Brasil.
 Regras:
 - Tom direto, urgência, escassez e benefícios do produto.
-- Linguagem falada, como se fosse uma narração de vídeo curto (30-60s).
 - Frases curtas e impactantes para manter a atenção.
+${durationGuide}
 - NÃO inclua preço nem link.
-- Máximo 200 palavras.
 - Responda APENAS com o texto da narração, sem títulos ou explicações extras.`;
 
+    const durationLabel = hasDuration ? ` de ${durationSec} segundos` : " curto";
     const userPrompt = style === "humor"
-      ? `Gere uma narração engraçada e viral para vídeo de venda deste produto: "${productName}".`
+      ? `Gere uma narração engraçada e viral para vídeo${durationLabel} de venda deste produto: "${productName}".`
       : style === "urgencia"
-        ? `Gere uma narração com muita urgência e escassez para vídeo de venda deste produto: "${productName}".`
-        : `Gere uma narração de venda persuasiva para vídeo curto deste produto: "${productName}".`;
+        ? `Gere uma narração com muita urgência e escassez para vídeo${durationLabel} de venda deste produto: "${productName}".`
+        : `Gere uma narração de venda persuasiva para vídeo${durationLabel} deste produto: "${productName}".`;
 
     const res = await fetch(GROK_API, {
       method: "POST",

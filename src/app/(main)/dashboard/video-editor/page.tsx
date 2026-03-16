@@ -326,10 +326,18 @@ export default function VideoEditorPage() {
     if (!copyProductName.trim()) return;
     setGeneratingCopy(true);
     try {
+      const videoTrack = tracks[0];
+      let videoDuration = 0;
+      if (videoTrack?.clips.length) {
+        for (const c of videoTrack.clips) {
+          const end = c.startTime + c.duration - c.trimStart - c.trimEnd;
+          if (end > videoDuration) videoDuration = end;
+        }
+      }
       const res = await fetch("/api/video-editor/generate-copy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName: copyProductName, style: copyStyle }),
+        body: JSON.stringify({ productName: copyProductName, style: copyStyle, videoDuration }),
       });
       const data = await res.json();
       if (data.copy) {
@@ -338,7 +346,7 @@ export default function VideoEditorPage() {
       }
     } catch { /* ignore */ }
     finally { setGeneratingCopy(false); }
-  }, [copyProductName, copyStyle]);
+  }, [copyProductName, copyStyle, tracks]);
 
   // Generate TTS
   const handleGenerateTts = useCallback(async () => {
