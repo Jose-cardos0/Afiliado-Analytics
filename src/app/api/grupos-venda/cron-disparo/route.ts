@@ -10,6 +10,25 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
+/** Verifica se o horário atual em Brasília (UTC-3, sem DST desde 2019) está dentro da janela configurada. */
+function isWithinBrasiliaWindow(horarioInicio: string | null, horarioFim: string | null): boolean {
+  if (!horarioInicio || !horarioFim) return true;
+
+  const now = new Date();
+  const brasiliaMinutes = ((now.getUTCHours() * 60 + now.getUTCMinutes()) - 180 + 1440) % 1440;
+
+  const [startH, startM] = horarioInicio.split(":").map(Number);
+  const [endH, endM] = horarioFim.split(":").map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return brasiliaMinutes >= startMinutes && brasiliaMinutes <= endMinutes;
+  }
+  // janela que atravessa meia-noite (ex: 22:00 → 06:00)
+  return brasiliaMinutes >= startMinutes || brasiliaMinutes <= endMinutes;
+}
+
 const SHOPEE_GQL = "https://open-api.affiliate.shopee.com.br/graphql";
 const WEBHOOK_URL = "https://n8n.iacodenxt.online/webhook/achadinhoN1";
 
@@ -36,7 +55,7 @@ export async function GET(req: NextRequest) {
 
   const { data: configs, error: configError } = await supabase
     .from("grupos_venda_continuo")
-    .select("id, user_id, instance_id, lista_id, lista_ofertas_id, keywords, sub_id_1, sub_id_2, sub_id_3, proximo_indice")
+    .select("id, user_id, instance_id, lista_id, lista_ofertas_id, keywords, sub_id_1, sub_id_2, sub_id_3, proximo_indice, horario_inicio, horario_fim")
     .eq("ativo", true);
 
   if (configError || !configs?.length) {
@@ -53,6 +72,13 @@ export async function GET(req: NextRequest) {
     const keywords = (cfg.keywords as string[]) ?? [];
     const proximoIndice = Number(cfg.proximo_indice) ?? 0;
     const subIds = [cfg.sub_id_1, cfg.sub_id_2, cfg.sub_id_3].filter(Boolean) as string[];
+    const horarioInicio = (cfg as { horario_inicio?: string | null }).horario_inicio ?? null;
+    const horarioFim = (cfg as { horario_fim?: string | null }).horario_fim ?? null;
+
+    if (!isWithinBrasiliaWindow(horarioInicio, horarioFim)) {
+      results.push({ userId, ok: true, error: "Fora do horário configurado" });
+      continue;
+    }
 
     const isListaOfertasMode = !!listaOfertasId;
     if (!isListaOfertasMode && keywords.length === 0) {

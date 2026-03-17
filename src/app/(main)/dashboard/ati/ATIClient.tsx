@@ -1008,41 +1008,63 @@ export default function ATIClient() {
     <>
       {loading && <LoadingOverlay message="Carregando dados Meta e Shopee..." />}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-text-primary font-heading whitespace-nowrap">
-          Advanced Traffic Intelligence (ATI)
-        </h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-text-secondary" />
-            <input
-              type="date"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className="rounded-md border border-dark-border bg-dark-bg py-1.5 px-2 text-text-primary text-sm"
-            />
-            <span className="text-text-secondary">até</span>
-            <input
-              type="date"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              className="rounded-md border border-dark-border bg-dark-bg py-1.5 px-2 text-text-primary text-sm"
-            />
+      {/* ── Header ── */}
+      <div className="mb-5">
+        {/* Título + controles de período — numa única linha no desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Título */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-shopee-orange/15 border border-shopee-orange/25 flex items-center justify-center shrink-0">
+              <TrendingUp className="h-4 w-4 text-shopee-orange" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-text-primary leading-tight truncate">Advanced Traffic Intelligence</h1>
+              <p className="text-[11px] text-text-secondary/70 mt-px">Cruzamento Meta Ads × Shopee por criativo</p>
+            </div>
           </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="rounded-md bg-shopee-orange px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-          >
-            Atualizar
-          </button>
+
+          {/* Período + botão */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 bg-dark-card border border-dark-border rounded-xl px-3 py-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-text-secondary/60 shrink-0" />
+              <input
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className="bg-transparent text-text-primary text-xs w-[100px] focus:outline-none cursor-pointer"
+              />
+              <span className="text-text-secondary/50 text-xs select-none">—</span>
+              <input
+                type="date"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                className="bg-transparent text-text-primary text-xs w-[100px] focus:outline-none cursor-pointer"
+              />
+            </div>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-shopee-orange px-3.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+            >
+              {loading
+                ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                : null}
+              Atualizar
+            </button>
+            {campaignsList.length > 0 && (
+              <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-dark-card border border-dark-border text-text-secondary shrink-0">
+                <BarChart3 className="h-2.5 w-2.5" />
+                {campaignsList.length}c · {creatives.length}cr
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-lg border border-red-500/30 bg-red-500/10 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div>
+        <div className="mb-5 p-3 rounded-xl border border-red-500/40 bg-red-500/10 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-400">{error}</p>
             <p className="text-xs text-text-secondary mt-1">
               Confirme que o token do Meta e as chaves da Shopee estão configurados.{" "}
@@ -1051,72 +1073,101 @@ export default function ATIClient() {
               </button>
             </p>
           </div>
+          <button type="button" onClick={() => setError(null)} className="text-red-400/60 hover:text-red-400 text-xs shrink-0">✕</button>
         </div>
       )}
 
       {validated.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-text-primary font-heading mb-3 flex items-center gap-2">
-            <Rocket className="h-5 w-5 text-emerald-500" />
-            Criativos Validados (Escala)
-          </h2>
-          <p className="text-sm text-text-secondary mb-3">
-            Aguarde pelo menos 3 dias após aumentar o orçamento para o Meta estabilizar. Não mexa no orçamento durante esse período.
-          </p>
-          <ul className="space-y-2">
-            {validated.map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-4 py-2 px-3 rounded-md bg-dark-card border border-dark-border">
-                <div>
-                  <p className="text-sm font-medium text-text-primary">{v.adName}</p>
-                  <p className="text-xs text-text-secondary">{v.campaignName} · Escalado em {new Date(v.scaledAt).toLocaleDateString("pt-BR")}</p>
-                </div>
-                <button onClick={() => handleRemoveValidated(v.id)} className="text-xs text-red-400 hover:text-red-300">Remover</button>
-              </li>
-            ))}
-          </ul>
+        <section className="mb-6">
+          <div className="bg-dark-card rounded-xl border border-emerald-500/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/15">
+              <Rocket className="h-4 w-4 text-emerald-400 shrink-0" />
+              <h2 className="text-sm font-semibold text-emerald-400 uppercase tracking-wide flex-1">
+                Criativos Validados — Escala
+              </h2>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                {validated.length} criativo{validated.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-text-secondary mb-3 flex items-center gap-1.5">
+                <span className="inline-block w-1 h-1 rounded-full bg-amber-400" />
+                Aguarde ≥ 3 dias após aumentar o orçamento para o Meta estabilizar. Não mexa no orçamento durante esse período.
+              </p>
+              <ul className="space-y-1.5">
+                {validated.map((v) => (
+                  <li key={v.id} className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{v.adName}</p>
+                        <p className="text-xs text-text-secondary">{v.campaignName} · Escalado em {new Date(v.scaledAt).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRemoveValidated(v.id)}
+                      className="shrink-0 p-1.5 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </section>
       )}
 
       <section>
-        <h2 className="text-lg font-semibold text-text-primary font-heading mb-3 flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-shopee-orange" />
-          Análise por Criativo
-        </h2>
-
         {/* Filtros */}
-        {creatives.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Search className="h-4 w-4 text-text-secondary" />
-            <input
-              type="text"
-              placeholder="Filtrar por campanha"
-              value={filterCampaign}
-              onChange={(e) => setFilterCampaign(e.target.value)}
-              className="rounded-md border border-dark-border bg-dark-bg py-1.5 px-3 text-text-primary text-sm placeholder-text-secondary/60 w-44"
-            />
-            <input
-              type="text"
-              placeholder="Filtrar por conjunto"
-              value={filterAdSet}
-              onChange={(e) => setFilterAdSet(e.target.value)}
-              className="rounded-md border border-dark-border bg-dark-bg py-1.5 px-3 text-text-primary text-sm placeholder-text-secondary/60 w-44"
-            />
-            <input
-              type="text"
-              placeholder="Filtrar por anúncio"
-              value={filterAd}
-              onChange={(e) => setFilterAd(e.target.value)}
-              className="rounded-md border border-dark-border bg-dark-bg py-1.5 px-3 text-text-primary text-sm placeholder-text-secondary/60 w-44"
-            />
+        {(creatives.length > 0 || campaignsList.length > 0) && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {/* Input unificado com ícone + separadores */}
+            <div className="flex flex-1 min-w-0 items-center bg-dark-card border border-dark-border/40 rounded-xl overflow-hidden divide-x divide-dark-border/40">
+              <div className="relative flex-1 min-w-[100px] group">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-secondary/40 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Campanha"
+                  value={filterCampaign}
+                  onChange={(e) => setFilterCampaign(e.target.value)}
+                  className="w-full bg-transparent pl-7 pr-3 pt-2 pb-1.5 text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none border-b-2 border-transparent focus:border-shopee-orange transition-colors"
+                />
+              </div>
+              <div className="relative flex-1 min-w-[100px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-secondary/40 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Conjunto"
+                  value={filterAdSet}
+                  onChange={(e) => setFilterAdSet(e.target.value)}
+                  className="w-full bg-transparent pl-7 pr-3 pt-2 pb-1.5 text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none border-b-2 border-transparent focus:border-shopee-orange transition-colors"
+                />
+              </div>
+              <div className="relative flex-1 min-w-[100px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-secondary/40 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Anúncio"
+                  value={filterAd}
+                  onChange={(e) => setFilterAd(e.target.value)}
+                  className="w-full bg-transparent pl-7 pr-3 pt-2 pb-1.5 text-xs text-text-primary placeholder-text-secondary/40 focus:outline-none border-b-2 border-transparent focus:border-shopee-orange transition-colors"
+                />
+              </div>
+            </div>
+            {(filterCampaign || filterAdSet || filterAd) && (
+              <button type="button" onClick={() => { setFilterCampaign(""); setFilterAdSet(""); setFilterAd(""); }}
+                className="px-2.5 py-2 rounded-xl border border-dark-border/60 text-[11px] text-text-secondary/60 hover:text-red-400 hover:border-red-500/30 transition-all shrink-0">
+                ✕ limpar
+              </button>
+            )}
           </div>
         )}
 
         {/* Tutorial */}
-        <div className="mb-6 rounded-lg border border-dark-border bg-dark-card overflow-hidden">
+        <div className="mb-5 rounded-xl border border-dark-border bg-dark-card overflow-hidden">
           <button
             type="button"
             onClick={() => setHelpOpen((o) => !o)}
-            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-dark-bg/50 transition-colors"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-dark-bg/40 transition-colors"
           >
             <span className="flex items-center gap-2 text-sm font-semibold text-text-primary">
               <HelpCircle className="h-4 w-4 text-shopee-orange" />
@@ -1157,193 +1208,194 @@ export default function ATIClient() {
         </div>
 
         {creatives.length === 0 && campaignsList.length === 0 && !loading ? (
-          <div className="bg-dark-card border border-dark-border rounded-lg p-8 text-center text-text-secondary">
-            <p>Nenhum dado no período ou integrações não configuradas.</p>
-            <p className="text-sm mt-2">
-              Use o mesmo Sub-ID nos seus links do Meta que o <code className="bg-dark-bg px-1 rounded">ad_id</code> do anúncio para cruzar com as vendas da Shopee.
-            </p>
+          <div className="bg-dark-card border border-dashed border-dark-border rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-shopee-orange/10 border border-shopee-orange/20 flex items-center justify-center">
+              <BarChart3 className="h-6 w-6 text-shopee-orange/60" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Nenhum dado no período</p>
+              <p className="text-xs text-text-secondary mt-1 max-w-sm">
+                Integrações não configuradas ou sem criativos ativos. Use o <code className="bg-dark-bg px-1 rounded text-shopee-orange">ad_id</code> do Meta como Sub-ID no link da Shopee para cruzar as vendas.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => router.push("/configuracoes")}
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-md bg-shopee-orange text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 mt-1 px-4 py-2 rounded-xl bg-shopee-orange text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-[0_2px_12px_rgba(238,77,45,0.2)]"
             >
               <Settings className="h-4 w-4" /> Configurar Meta e Shopee
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {filteredAndGrouped.map((camp) => {
               const campaignOpen = expandedCampaigns[camp.campaignId];
+              const campIsActive = campaignStatus[camp.campaignId] === "ACTIVE";
               return (
-                <div key={camp.campaignId} className="rounded-xl border border-dark-border bg-dark-card overflow-hidden">
-                  <div className="px-4 py-3 bg-dark-bg/50 border-b border-dark-border flex items-center justify-between gap-3">
+                <div key={camp.campaignId} className={`rounded-xl border overflow-hidden transition-all ${campIsActive ? "border-dark-border" : "border-dark-border/50 opacity-80"}`}>
+                  {/* ── Cabeçalho campanha ── */}
+                  <div className={`px-4 py-3 flex items-center justify-between gap-2 ${campIsActive ? "bg-dark-card" : "bg-dark-bg/60"}`}>
                     <button
                       type="button"
                       onClick={() => toggleCampaign(camp.campaignId)}
                       className="flex items-center gap-2 flex-1 min-w-0 text-left hover:opacity-90 transition-opacity cursor-pointer"
                     >
                       {campaignOpen ? (
-                        <ChevronUp className="h-5 w-5 flex-shrink-0 text-text-secondary" />
+                        <ChevronUp className="h-4 w-4 shrink-0 text-text-secondary" />
                       ) : (
-                        <ChevronDown className="h-5 w-5 flex-shrink-0 text-text-secondary" />
+                        <ChevronDown className="h-4 w-4 shrink-0 text-text-secondary" />
                       )}
                       <div className="min-w-0">
-                        <h3 className="text-base font-bold text-text-primary font-heading truncate">{camp.campaignName}</h3>
-                        <p className="text-xs text-text-secondary mt-0.5">Campanha</p>
+                        <h3 className="text-sm font-bold text-text-primary truncate">{camp.campaignName}</h3>
+                        <p className="text-[11px] text-text-secondary mt-0.5">{camp.adSets.length} conjunto{camp.adSets.length !== 1 ? "s" : ""}</p>
                       </div>
                     </button>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setCampaignEditModal({ campaignId: camp.campaignId, campaignName: camp.campaignName, objective: "OUTCOME_TRAFFIC" }); }}
-                        className="p-1.5 rounded-md text-text-secondary hover:bg-dark-bg hover:text-text-primary"
-                        title="Editar campanha"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setCampaignDeleteConfirm({ campaignId: camp.campaignId, campaignName: camp.campaignName }); }}
-                        className="p-1.5 rounded-md text-text-secondary hover:bg-red-500/20 hover:text-red-400"
-                        title="Deletar campanha"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                       <button
                         type="button"
                         disabled={traficoGruposTogglingId === camp.campaignId}
                         onClick={(e) => { e.stopPropagation(); handleToggleTraficoGrupos(camp.campaignId); }}
-                        title={campaignIdsTraficoGrupos.includes(camp.campaignId) ? "Remover tag Tráfego para Grupos" : "Marcar como Tráfego para Grupos (aparece na Calculadora GPL)"}
-                        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                        title={campaignIdsTraficoGrupos.includes(camp.campaignId) ? "Remover tag Tráfego para Grupos" : "Marcar como Tráfego para Grupos"}
+                        className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
                           campaignIdsTraficoGrupos.includes(camp.campaignId)
-                            ? "bg-shopee-orange/20 text-shopee-orange border border-shopee-orange/50"
-                            : "text-text-secondary border border-dark-border hover:bg-dark-bg hover:text-text-primary"
+                            ? "bg-shopee-orange/15 text-shopee-orange border border-shopee-orange/40"
+                            : "text-text-secondary border border-dark-border hover:border-shopee-orange/40 hover:text-shopee-orange"
                         } disabled:opacity-50`}
                       >
                         {traficoGruposTogglingId === camp.campaignId ? (
-                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         ) : (
-                          <MessageCircle className="h-3.5 w-3.5" />
+                          <MessageCircle className="h-3 w-3" />
                         )}
-                        Tráfego para Grupos
+                        <span className="hidden md:inline">Grupos</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setCampaignEditModal({ campaignId: camp.campaignId, campaignName: camp.campaignName, objective: "OUTCOME_TRAFFIC" }); }}
+                        className="p-1.5 rounded-lg text-text-secondary hover:bg-dark-bg hover:text-text-primary transition-all"
+                        title="Editar campanha"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setCampaignDeleteConfirm({ campaignId: camp.campaignId, campaignName: camp.campaignName }); }}
+                        className="p-1.5 rounded-lg text-text-secondary hover:bg-red-500/15 hover:text-red-400 transition-all"
+                        title="Deletar campanha"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      {/* Toggle ativo/pausado */}
+                      <div className="flex items-center gap-1.5 pl-1 border-l border-dark-border/60 ml-0.5">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={campIsActive}
+                          disabled={campaignTogglingId === camp.campaignId}
+                          onClick={(e) => { e.stopPropagation(); handleCampaignStatusToggle(camp.campaignId); }}
+                          title={campIsActive ? "Pausar campanha" : "Ativar campanha"}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none disabled:opacity-50 ${
+                            campIsActive ? "bg-emerald-500 border-transparent" : "bg-dark-border border-gray-600"
+                          }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition ${campIsActive ? "translate-x-4" : "translate-x-0.5"}`} />
+                        </button>
+                        <span className={`text-[11px] font-medium shrink-0 ${campIsActive ? "text-emerald-400" : "text-text-secondary"}`}>
+                          {campIsActive ? "Ativo" : "Pausado"}
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={campaignStatus[camp.campaignId] === "ACTIVE"}
-                      disabled={campaignTogglingId === camp.campaignId}
-                      onClick={(e) => { e.stopPropagation(); handleCampaignStatusToggle(camp.campaignId); }}
-                      title={campaignStatus[camp.campaignId] === "ACTIVE" ? "Pausar campanha no Facebook" : "Ativar campanha no Facebook"}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:ring-offset-2 focus:ring-offset-dark-card disabled:opacity-50 ${
-                        campaignStatus[camp.campaignId] === "ACTIVE"
-                          ? "bg-emerald-500 border-transparent"
-                          : "bg-dark-border border-gray-600"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition ${
-                          campaignStatus[camp.campaignId] === "ACTIVE" ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                    <span className={`text-xs font-medium flex-shrink-0 ${campaignStatus[camp.campaignId] === "ACTIVE" ? "text-emerald-400" : "text-text-secondary"}`}>
-                      {campaignStatus[camp.campaignId] === "ACTIVE" ? "Ativo" : "Desativado"}
-                    </span>
                   </div>
                   {campaignOpen && (
                     <div className="border-t border-dark-border">
                       {camp.adAccountId && (
-                        <div className="px-4 py-2 pl-6 border-b border-dark-border/50 flex items-center gap-2">
+                        <div className="px-4 py-2 pl-5 border-b border-dark-border/40 flex items-center gap-2 bg-dark-bg/20">
                           <button
                             type="button"
                             onClick={() => { setAdSetNewModal({ campaignId: camp.campaignId, adAccountId: camp.adAccountId!, campaignName: camp.campaignName }); setAdSetNewError(null); }}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-dark-bg border border-dark-border px-2.5 py-1.5 text-xs font-medium text-text-primary hover:bg-dark-card"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-dark-bg border border-dark-border px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-shopee-orange/40 transition-all"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-3 w-3" />
                             Novo conjunto
                           </button>
                         </div>
                       )}
                       {camp.adSets.map((set) => {
                         const adSetOpen = expandedAdSets[set.adSetId];
+                        const adSetIsActive = adSetStatusMap[set.adSetId] === "ACTIVE";
                         return (
-                          <div key={set.adSetId} className="border-b border-dark-border/50 last:border-b-0">
-                            <div className="flex items-center w-full">
+                          <div key={set.adSetId} className="border-b border-dark-border/40 last:border-b-0">
+                            <div className="flex items-center w-full bg-dark-bg/30 hover:bg-dark-bg/50 transition-colors">
                               <button
                                 type="button"
                                 onClick={() => toggleAdSet(set.adSetId)}
-                                className="flex items-center gap-2 flex-1 min-w-0 px-4 py-2.5 pl-6 text-left hover:bg-dark-bg/40 transition-colors border-l-2 border-shopee-orange cursor-pointer"
+                                className="flex items-center gap-2 flex-1 min-w-0 px-4 py-2 pl-5 text-left border-l-2 border-shopee-orange/60 cursor-pointer"
                               >
                                 {adSetOpen ? (
-                                  <ChevronUp className="h-4 w-4 flex-shrink-0 text-text-secondary" />
+                                  <ChevronUp className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
                                 ) : (
-                                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-text-secondary" />
+                                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
                                 )}
                                 <div className="min-w-0">
-                                  <span className="text-sm font-semibold text-text-primary block truncate">{set.adSetName}</span>
-                                  <span className="text-xs text-text-secondary">Conjunto de anúncios</span>
+                                  <span className="text-xs font-semibold text-text-primary block truncate">{set.adSetName}</span>
+                                  <span className="text-[10px] text-text-secondary">{set.ads.length} anúncio{set.ads.length !== 1 ? "s" : ""}</span>
                                 </div>
                               </button>
-                              <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 pr-2 shrink-0">
                                 <button
                                   type="button"
                                   role="switch"
-                                  aria-checked={adSetStatusMap[set.adSetId] === "ACTIVE"}
+                                  aria-checked={adSetIsActive}
                                   disabled={adSetTogglingId === set.adSetId}
                                   onClick={(e) => { e.stopPropagation(); handleAdSetStatusToggle(set.adSetId); }}
-                                  title={adSetStatusMap[set.adSetId] === "ACTIVE" ? "Pausar conjunto" : "Ativar conjunto"}
-                                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-shopee-orange focus:ring-offset-2 focus:ring-offset-dark-card disabled:opacity-50 ${
-                                    adSetStatusMap[set.adSetId] === "ACTIVE"
-                                      ? "bg-emerald-500 border-transparent"
-                                      : "bg-dark-border border-gray-600"
-                                  }`}
+                                  title={adSetIsActive ? "Pausar conjunto" : "Ativar conjunto"}
+                                  className={`relative inline-flex h-4 w-8 shrink-0 rounded-full border-2 transition-colors disabled:opacity-50 ${adSetIsActive ? "bg-emerald-500 border-transparent" : "bg-dark-border border-gray-600"}`}
                                 >
-                                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition ${adSetStatusMap[set.adSetId] === "ACTIVE" ? "translate-x-4" : "translate-x-0.5"}`} />
+                                  <span className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow ring-0 transition ${adSetIsActive ? "translate-x-3.5" : "translate-x-0.5"}`} />
                                 </button>
-                                <span className={`text-xs font-medium ${adSetStatusMap[set.adSetId] === "ACTIVE" ? "text-emerald-400" : "text-text-secondary"}`}>
-                                  {adSetStatusMap[set.adSetId] === "ACTIVE" ? "Ativo" : "Desativado"}
+                                <span className={`text-[10px] font-medium hidden sm:inline ${adSetIsActive ? "text-emerald-400" : "text-text-secondary"}`}>
+                                  {adSetIsActive ? "Ativo" : "Pausado"}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setAdSetEditModal({ adSetId: set.adSetId, adSetName: set.adSetName, adAccountId: set.adAccountId ?? "", campaignId: camp.campaignId, campaignName: camp.campaignName }); setAdSetEditError(null); }}
-                                  className="p-1.5 rounded-md text-text-secondary hover:bg-dark-bg hover:text-text-primary"
+                                  className="p-1.5 rounded-lg text-text-secondary hover:bg-dark-bg hover:text-text-primary transition-all"
                                   title="Editar conjunto"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
+                                  <Pencil className="h-3 w-3" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setAdSetDeleteConfirm({ adSetId: set.adSetId, adSetName: set.adSetName }); }}
-                                  className="p-1.5 rounded text-text-secondary hover:bg-red-500/20 hover:text-red-400"
+                                  className="p-1.5 rounded-lg text-text-secondary hover:bg-red-500/15 hover:text-red-400 transition-all"
                                   title="Deletar conjunto"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3 w-3" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setAdSetDuplicateModal({ adSetId: set.adSetId, adSetName: set.adSetName }); setAdSetDuplicateCount("5"); }}
-                                  className="p-1.5 rounded text-text-secondary hover:bg-shopee-orange/20 hover:text-shopee-orange"
+                                  className="p-1.5 rounded-lg text-text-secondary hover:bg-shopee-orange/15 hover:text-shopee-orange transition-all"
                                   title="Duplicar conjunto"
                                 >
-                                  <CopyPlus className="h-3.5 w-3.5" />
+                                  <CopyPlus className="h-3 w-3" />
                                 </button>
                               </div>
                             </div>
                             {adSetOpen && set.adAccountId && (
-                              <div className="px-4 py-2 pl-6 border-b border-dark-border/50 flex items-center gap-2 bg-dark-bg/30">
+                              <div className="px-4 py-2 pl-7 border-b border-dark-border/40 flex items-center gap-2 bg-dark-bg/20">
                                 <button
                                   type="button"
                                   onClick={() => { setAdNewModal({ adAccountId: set.adAccountId!, adsetId: set.adSetId, adSetName: set.adSetName }); setAdNewError(null); }}
-                                  className="inline-flex items-center gap-1.5 rounded-md bg-dark-bg border border-dark-border px-2.5 py-1.5 text-xs font-medium text-text-primary hover:bg-dark-card"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-dark-bg border border-dark-border px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-text-primary hover:border-shopee-orange/40 transition-all"
                                 >
-                                  <Plus className="h-3.5 w-3.5" />
+                                  <Plus className="h-3 w-3" />
                                   Novo anúncio
                                 </button>
                               </div>
                             )}
                             {adSetOpen && (
-                              <div className="bg-dark-bg/20 pl-6 pr-4 py-3 space-y-2">
+                              <div className="bg-dark-bg/10 pl-7 pr-3 py-2.5 space-y-1.5">
                                 {set.ads.map((row) => (
                                   <AdAccordionItem
                                     key={row.adId}
@@ -1387,35 +1439,44 @@ export default function ATIClient() {
       </section>
 
       {linkModalOpen && linkModalAd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setLinkModalOpen(false)}>
-          <div className="bg-dark-card border border-dark-border rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-text-primary">{linkModalLoadingLink ? "Link de anúncio" : linkModalTitle}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setLinkModalOpen(false)}>
+          <div className="bg-dark-card border border-dark-border rounded-2xl shadow-2xl max-w-lg w-full p-0 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border bg-dark-bg/40">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-shopee-orange" />
+                <h3 className="text-sm font-semibold text-text-primary">{linkModalLoadingLink ? "Link de anúncio" : linkModalTitle}</h3>
+              </div>
+              <button type="button" onClick={() => setLinkModalOpen(false)} className="text-text-secondary hover:text-text-primary transition-colors">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
             {linkModalAdId && adIdToHasLink[linkModalAdId] === true && (
-              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
-                <p className="text-sm font-medium text-amber-200">
-                  ATENÇÃO: Ao editar o link do anúncio, você perderá todos os dados do anúncio atual e iniciará um novo. Aconselhamos que crie um novo AD ao invés de alterar este!
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/8 p-3 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-amber-300">
+                  Ao editar o link, você perderá os dados de aprendizado do anúncio atual. Considere criar um novo AD em vez de alterar este.
                 </p>
               </div>
             )}
-            <p className="text-sm text-text-secondary">
+            <p className="text-xs text-text-secondary">
               Anúncio: <strong className="text-text-primary">{linkModalAd.adName}</strong>
             </p>
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Seu link da Shopee</label>
-              <input type="url" value={linkModalShopeeLink} onChange={(e) => setLinkModalShopeeLink(e.target.value)} placeholder="https://s.shopee.com.br/60MfL7egOy" className="w-full rounded-md border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm placeholder-text-secondary/60" />
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Link da Shopee</label>
+              <input type="url" value={linkModalShopeeLink} onChange={(e) => setLinkModalShopeeLink(e.target.value)} placeholder="https://s.shopee.com.br/60MfL7egOy" className="w-full rounded-xl border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm placeholder-text-secondary/50 focus:outline-none focus:border-shopee-orange transition-colors" />
             </div>
-            <p className="text-xs text-text-secondary">
-              Ao clicar em publicar, vamos ativar sua campanha com seu link de vendas da shopee e o ATI iniciará.
+            <p className="text-xs text-text-secondary/70">
+              Ao publicar, o <code className="bg-dark-bg px-1 rounded text-shopee-orange">utm_content</code> será preenchido com o ad_id automaticamente para rastreamento no ATI.
             </p>
             {linkModalError && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 space-y-1">
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 space-y-1">
                 <p className="text-sm font-medium text-red-400">{linkModalError}</p>
                 {linkModalErrorDetail && <p className="text-xs text-red-300/90">{linkModalErrorDetail}</p>}
-                <p className="text-xs text-text-secondary mt-1">Abra o Console do navegador (F12 → Console) para ver o objeto completo do erro.</p>
+                <p className="text-xs text-text-secondary mt-1">Abra o Console (F12) para ver o erro completo.</p>
               </div>
             )}
-            <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setLinkModalOpen(false)} className="rounded-md border border-dark-border py-2 px-4 text-sm font-medium text-text-secondary hover:bg-dark-bg">Cancelar</button>
+            <div className="flex gap-2 justify-end pt-1">
+              <button type="button" onClick={() => setLinkModalOpen(false)} className="rounded-xl border border-dark-border py-2 px-4 text-sm font-medium text-text-secondary hover:bg-dark-bg transition-colors">Cancelar</button>
               <button
                 type="button"
                 disabled={!linkModalAdId || !linkModalShopeeLink.trim() || linkModalPublishing}
@@ -1452,10 +1513,11 @@ export default function ATIClient() {
                     setLinkModalPublishing(false);
                   }
                 }}
-                className="flex items-center gap-2 rounded-md bg-shopee-orange py-2 px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-shopee-orange py-2 px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 shadow-[0_2px_12px_rgba(238,77,45,0.25)] transition-all"
               >
-                {linkModalPublishing ? "Publicando…" : "PUBLICAR"}
+                {linkModalPublishing ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Publicando…</> : "Publicar"}
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -1463,9 +1525,9 @@ export default function ATIClient() {
 
       {/* Editar campanha */}
       {campaignEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setCampaignEditModal(null)}>
-          <div className="bg-dark-card border border-dark-border rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-text-primary">Editar campanha</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setCampaignEditModal(null)}>
+          <div className="bg-dark-card border border-dark-border rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2"><Pencil className="h-4 w-4 text-shopee-orange" /> Editar campanha</h3>
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Nome</label>
               <input
@@ -1497,9 +1559,9 @@ export default function ATIClient() {
 
       {/* Deletar campanha */}
       {campaignDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setCampaignDeleteConfirm(null)}>
-          <div className="bg-dark-card border border-dark-border rounded-xl shadow-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-text-primary">Deletar campanha</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setCampaignDeleteConfirm(null)}>
+          <div className="bg-dark-card border border-red-500/20 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2"><Trash2 className="h-4 w-4 text-red-400" /> Deletar campanha</h3>
             <p className="text-sm text-text-secondary">Tem certeza que deseja deletar a campanha <strong className="text-text-primary">{campaignDeleteConfirm.campaignName}</strong>? Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setCampaignDeleteConfirm(null)} className="rounded-md border border-dark-border py-2 px-4 text-sm font-medium text-text-secondary hover:bg-dark-bg">Cancelar</button>

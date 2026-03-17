@@ -18,13 +18,13 @@ export async function GET() {
 
     const { data: rows, error } = await supabase
       .from("grupos_venda_continuo")
-      .select("id, lista_id, instance_id, lista_ofertas_id, keywords, sub_id_1, sub_id_2, sub_id_3, ativo, proximo_indice, ultimo_disparo_at, updated_at")
+      .select("id, lista_id, instance_id, lista_ofertas_id, keywords, sub_id_1, sub_id_2, sub_id_3, ativo, proximo_indice, ultimo_disparo_at, updated_at, horario_inicio, horario_fim")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    type Row = { id: string; lista_id: string | null; instance_id: string; lista_ofertas_id?: string | null; keywords: string[]; sub_id_1: string; sub_id_2: string; sub_id_3: string; ativo: boolean; proximo_indice: number; ultimo_disparo_at: string | null; updated_at: string };
+    type Row = { id: string; lista_id: string | null; instance_id: string; lista_ofertas_id?: string | null; keywords: string[]; sub_id_1: string; sub_id_2: string; sub_id_3: string; ativo: boolean; proximo_indice: number; ultimo_disparo_at: string | null; updated_at: string; horario_inicio: string | null; horario_fim: string | null };
     const list = (rows ?? []) as Row[];
     const listaIds = [...new Set(list.map((r) => r.lista_id).filter(Boolean))] as string[];
     const listasMap: Record<string, string> = {};
@@ -59,6 +59,8 @@ export async function GET() {
         ultimoDisparoAt: r.ultimo_disparo_at,
         updatedAt: r.updated_at,
         proximaKeyword: keywords.length > 0 ? keywords[idx % keywords.length] : null,
+        horarioInicio: r.horario_inicio ?? null,
+        horarioFim: r.horario_fim ?? null,
       };
     });
 
@@ -88,6 +90,8 @@ export async function POST(req: Request) {
     const subId1 = typeof body.subId1 === "string" ? body.subId1.trim() : "";
     const subId2 = typeof body.subId2 === "string" ? body.subId2.trim() : "";
     const subId3 = typeof body.subId3 === "string" ? body.subId3.trim() : "";
+    const horarioInicio = typeof body.horarioInicio === "string" && body.horarioInicio.trim() ? body.horarioInicio.trim() : null;
+    const horarioFim = typeof body.horarioFim === "string" && body.horarioFim.trim() ? body.horarioFim.trim() : null;
 
     const now = new Date().toISOString();
 
@@ -143,6 +147,8 @@ export async function POST(req: Request) {
       sub_id_1: subId1,
       sub_id_2: subId2,
       sub_id_3: subId3,
+      horario_inicio: horarioInicio,
+      horario_fim: horarioFim,
       ativo: true,
       proximo_indice: 0,
       updated_at: now,
