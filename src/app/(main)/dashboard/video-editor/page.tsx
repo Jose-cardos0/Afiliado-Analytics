@@ -15,6 +15,7 @@ import {
   type VideoInputProps, type VideoStyleId, type MediaAsset, type CaptionWord, type SubtitleTheme,
 } from "../../../../../remotion/types";
 import { useRemotionSandboxRender } from "../../../../hooks/use-remotion-sandbox-render";
+import { resolveInputPropsForRender } from "../../../../lib/remotion/resolve-input-props-for-render";
 
 type Voice = { voice_id: string; name: string; preview_url: string | null; labels: Record<string, string> };
 type MusicTrack = { id: string; name: string; artist: string; duration: number; audioUrl: string; downloadUrl: string; coverUrl: string };
@@ -163,6 +164,7 @@ export default function VideoEditorPage() {
   // ── Step 4 ──
   const [error, setError] = useState<string | null>(null);
   const remotionExport = useRemotionSandboxRender();
+  const [exportPrep, setExportPrep] = useState(false);
 
   const dimensions = useMemo(() => {
     switch (aspectRatio) {
@@ -1252,24 +1254,42 @@ export default function VideoEditorPage() {
                 <button
                   type="button"
                   disabled={
-                    remotionExport.state.status === "invoking"
+                    exportPrep
+                    || remotionExport.state.status === "invoking"
                     || selectedAssets.length === 0
                   }
-                  onClick={() => void remotionExport.startRender(compositionProps)}
+                  onClick={() => {
+                    void (async () => {
+                      setError(null);
+                      try {
+                        setExportPrep(true);
+                        const resolved = await resolveInputPropsForRender(compositionProps);
+                        setExportPrep(false);
+                        await remotionExport.startRender(resolved);
+                      } catch (e) {
+                        setExportPrep(false);
+                        setError(e instanceof Error ? e.message : "Erro ao preparar exportação");
+                      }
+                    })();
+                  }}
                   className={`w-full flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-all ${
-                    remotionExport.state.status === "invoking" || selectedAssets.length === 0
+                    exportPrep
+                    || remotionExport.state.status === "invoking"
+                    || selectedAssets.length === 0
                       ? "bg-gradient-to-r from-shopee-orange/40 to-shopee-orange/20 border-shopee-orange/30 text-shopee-orange/60 cursor-not-allowed"
                       : "bg-gradient-to-r from-shopee-orange to-shopee-orange/90 border-shopee-orange text-white hover:opacity-95 cursor-pointer"
                   }`}
                 >
-                  {remotionExport.state.status === "invoking" ? (
+                  {exportPrep || remotionExport.state.status === "invoking" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  {remotionExport.state.status === "invoking"
-                    ? "Renderizando..."
-                    : "Exportar MP4"}
+                  {exportPrep
+                    ? "Preparando mídias..."
+                    : remotionExport.state.status === "invoking"
+                      ? "Renderizando..."
+                      : "Exportar MP4"}
                 </button>
                 {remotionExport.state.status === "invoking" && (
                   <div className="space-y-1">

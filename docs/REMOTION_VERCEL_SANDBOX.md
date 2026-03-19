@@ -19,17 +19,23 @@ Documentação oficial Remotion: [Vercel Sandbox](https://www.remotion.dev/docs/
 | Hook no front | `src/hooks/use-remotion-sandbox-render.ts` — consome SSE e mostra progresso |
 | Botão Exportar | `src/app/(main)/dashboard/video-editor/page.tsx` — passo 4 do gerador |
 | Inclusão do bundle no deploy | `vercel.json` → `functions` → `includeFiles` para a rota de render |
-| Dependências | `@remotion/vercel`, `@vercel/sandbox`, `@vercel/functions` |
+| Dependências | `@remotion/vercel`, `@vercel/sandbox`, `@vercel/functions`, `@vercel/blob` |
+| Publicar `blob:` antes do render | `src/lib/remotion/resolve-input-props-for-render.ts` + `POST /api/video-editor/publish-blob-for-render` |
+
+### URLs `blob:` no navegador
+
+Voz IA, música enviada manualmente e arquivos enviados pelo usuário usam `URL.createObjectURL()` (URLs `blob:`). O **sandbox na Vercel não acessa** esses endereços. Antes do render, o app **sobe** esses arquivos para o **Vercel Blob** e troca por **HTTPS público**. Arquivos **maiores que ~4MB** nesse upload precisam de mídia já pública (ex.: import da Shopee).
 
 ---
 
 ## 2. Fluxo técnico (resumo)
 
 1. Usuário clica **Exportar MP4** no passo 4.
-2. O front envia `POST /api/remotion/render-mp4` com `{ inputProps }` (mesmo objeto do `<Player />`).
-3. A API abre um **Vercel Sandbox**, envia o **bundle** (`remotion/static-bundle`), chama `renderMediaOnVercel`, depois `uploadToVercelBlob`.
-4. A resposta é **Server-Sent Events (SSE)** com fases de progresso e, ao final, `{ type: "done", url, size }`.
-5. O front exibe link para abrir/baixar o MP4.
+2. O front **resolve** `blob:` (e `data:`) em URLs públicas via `publish-blob-for-render` quando necessário.
+3. O front envia `POST /api/remotion/render-mp4` com `{ inputProps }` (mesmo objeto do `<Player />`, já com URLs públicas).
+4. A API abre um **Vercel Sandbox**, envia o **bundle** (`remotion/static-bundle`), chama `renderMediaOnVercel`, depois `uploadToVercelBlob`.
+5. A resposta é **Server-Sent Events (SSE)** com fases de progresso e, ao final, `{ type: "done", url, size }`.
+6. O front exibe link para abrir/baixar o MP4.
 
 ---
 

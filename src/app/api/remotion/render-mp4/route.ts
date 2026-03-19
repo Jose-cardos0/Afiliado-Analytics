@@ -30,7 +30,7 @@ function assertBundleExists(): void {
 }
 
 export async function POST(req: Request) {
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) {
     return NextResponse.json(
       {
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
       const { url, size } = await uploadToVercelBlob({
         sandbox,
         sandboxFilePath,
-        contentType,
+        contentType: contentType?.trim() || "video/mp4",
         blobToken,
         access: "public",
       });

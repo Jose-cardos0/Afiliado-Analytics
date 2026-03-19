@@ -33,9 +33,16 @@ export function useRemotionSandboxRender() {
       });
 
       if (!response.ok || !response.body) {
-        const errJson = await response.json().catch(() => ({}));
+        const raw = await response.text().catch(() => "");
+        let msg = raw;
+        try {
+          const errJson = JSON.parse(raw) as { error?: string };
+          if (typeof errJson?.error === "string") msg = errJson.error;
+        } catch {
+          /* usar texto cru */
+        }
         throw new Error(
-          typeof errJson?.error === "string" ? errJson.error : "Falha ao iniciar render",
+          msg || `Falha ao iniciar render (HTTP ${response.status})`,
         );
       }
 

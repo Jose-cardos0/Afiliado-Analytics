@@ -21,6 +21,7 @@
     "@remotion/player": "^4.0.438",
     "@remotion/transitions": "^4.0.438",
     "@remotion/vercel": "^4.0.438",
+    "@vercel/blob": "^2.3.0",
     "@vercel/functions": "^3.4.1",
     "@vercel/sandbox": "^1.6.0",
     "@sparticuz/chromium": "^143.0.4",
