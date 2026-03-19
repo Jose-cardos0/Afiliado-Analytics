@@ -275,10 +275,10 @@ function AdAccordionItem({
           <div className="rounded-lg border border-dark-border/80 bg-dark-card/50 p-3 space-y-2">
             <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
               <ShoppingBag className="h-3.5 w-3.5 text-shopee-orange" />
-              Sub ID Shopee (Sub1 do gerador) — cruzamento com vendas
+              Seu Sub ID Shopee
             </p>
             <p className="text-[11px] text-text-secondary leading-relaxed">
-              Gere o link no <strong className="text-text-primary">Gerador de links</strong> com o mesmo código em <strong>Sub ID 1</strong> e cole aqui. Deve bater com o que aparece no relatório da Shopee.
+              Anexe o seu sub id Shopee para que possamos cruzar tráfego x vendas.
             </p>
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex-1 min-w-[140px]">
@@ -1171,7 +1171,7 @@ export default function ATIClient() {
   }, [filteredAndGrouped.length]);
 
   const shopeePeriodLabel = `${new Date(start).toLocaleDateString("pt-BR")} – ${new Date(end).toLocaleDateString("pt-BR")}`;
-  const dateLabel = `Meta: gasto/cliques lifetime · Vendas Shopee: ${shopeePeriodLabel}`;
+  const dateLabel = `Vendas Shopee: ${shopeePeriodLabel}`;
 
   return (
     <>
@@ -1186,9 +1186,7 @@ export default function ATIClient() {
             </div>
             <div className="min-w-0">
               <h1 className="text-base font-bold text-text-primary leading-tight truncate">Advanced Traffic Intelligence</h1>
-              <p className="text-[11px] text-text-secondary/70 mt-px">
-                Feito para <strong className="text-shopee-orange/90">afiliados Shopee</strong>: valor das vendas ≠ comissão. ROAS = comissão ÷ custo Meta. Período abaixo = só vendas Shopee.
-              </p>
+            
             </div>
           </div>
 
