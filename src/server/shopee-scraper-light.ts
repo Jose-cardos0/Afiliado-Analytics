@@ -1,17 +1,10 @@
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any, no-eval */
 /**
  * Shopee product scraper — works on localhost AND Vercel serverless.
  *
- * Stack:
- *   puppeteer-extra + stealth  → anti-bot bypass
- *   puppeteer                  → peer for puppeteer-extra
- *   puppeteer-core             → lightweight launch API
- *   @sparticuz/chromium        → serverless Chromium binary
- *
- * All listed in next.config.ts → serverExternalPackages so
- * Next.js does NOT try to bundle them (avoids CJS resolution errors).
- *
- * On Vercel: set env var  PUPPETEER_SKIP_DOWNLOAD = 1
+ * Vercel: puppeteer-core + @sparticuz/chromium + manual stealth evasions
+ *         (avoids puppeteer-extra-plugin-stealth dependency issues)
+ * Local:  puppeteer-extra + stealth plugin (full evasion set)
  */
 
 const VIDEO_RE = /\.(mp4|m3u8|webm|ts)(\?|$)/i;
@@ -24,31 +17,91 @@ function fullSize(url: string): string {
 }
 
 function isJunk(url: string): boolean {
-  return /icon|logo|badge|payment|pix|boleto|qrcode|banner|sprite|favicon|placeholder|seller_avatar|shop_avatar|flag|social|facebook|instagram|tiktok|twitter/i.test(url);
+  return /icon|logo|badge|payment|pix|boleto|qrcode|banner|sprite|favicon|placeholder|seller_avatar|shop_avatar|flag|social|facebook|instagram|tiktok|twitter|deo\.shopeemobile/i.test(url);
 }
 
-async function getBrowser(): Promise<any> {
+/**
+ * Manual stealth evasions — replaces puppeteer-extra-plugin-stealth on Vercel.
+ * Injects scripts via evaluateOnNewDocument to hide automation signals.
+ */
+async function applyStealthEvasions(page: any): Promise<void> {
+  await page.evaluateOnNewDocument(() => {
+    // Hide webdriver flag
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+
+    // Fake chrome runtime
+    (window as any).chrome = {
+      runtime: { onConnect: { addListener: () => {} }, sendMessage: () => {} },
+      loadTimes: () => ({}),
+      csi: () => ({}),
+    };
+
+    // Override permissions query
+    const origQuery = Permissions.prototype.query;
+    Permissions.prototype.query = function (desc: any) {
+      if (desc.name === "notifications") return Promise.resolve({ state: "denied" } as PermissionStatus);
+      return origQuery.call(this, desc);
+    };
+
+    // Fake plugins
+    Object.defineProperty(navigator, "plugins", {
+      get: () => [
+        { name: "Chrome PDF Plugin", filename: "internal-pdf-viewer" },
+        { name: "Chrome PDF Viewer", filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai" },
+        { name: "Native Client", filename: "internal-nacl-plugin" },
+      ],
+    });
+
+    // Fake languages
+    Object.defineProperty(navigator, "languages", { get: () => ["pt-BR", "pt", "en-US", "en"] });
+
+    // Fake platform
+    Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+
+    // Prevent iframe detection
+    Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", {
+      get: function () {
+        return window;
+      },
+    });
+
+    // Spoof WebGL
+    const getParam = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function (param: number) {
+      if (param === 37445) return "Intel Inc.";
+      if (param === 37446) return "Intel Iris OpenGL Engine";
+      return getParam.call(this, param);
+    };
+  });
+}
+
+async function getBrowser(): Promise<{ browser: any; isVercel: boolean }> {
   const isVercel = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
   if (isVercel) {
     const puppeteerCore = require("puppeteer-core");
     const chromium = require("@sparticuz/chromium");
-    return puppeteerCore.launch({
+    const browser = await puppeteerCore.launch({
       args: [
         ...chromium.args,
         "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
       ],
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
       defaultViewport: { width: 1280, height: 800 },
     });
+    return { browser, isVercel: true };
   }
 
-  const puppeteer = require("puppeteer-extra");
-  const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+  // eval('require') prevents Turbopack from tracing these modules
+  const _require = eval("require") as NodeRequire;
+  const puppeteer = _require("puppeteer-extra");
+  const StealthPlugin = _require("puppeteer-extra-plugin-stealth");
   puppeteer.use(StealthPlugin());
 
-  const fs = require("fs");
+  const fs = _require("fs") as typeof import("fs");
   const paths = [
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
@@ -64,7 +117,7 @@ async function getBrowser(): Promise<any> {
   }
   if (!exe) throw new Error("Chrome não encontrado. Instale Google Chrome ou defina CHROME_EXECUTABLE_PATH.");
 
-  return puppeteer.launch({
+  const browser = await puppeteer.launch({
     executablePath: exe,
     headless: "shell",
     args: [
@@ -75,14 +128,25 @@ async function getBrowser(): Promise<any> {
     ],
     defaultViewport: { width: 1280, height: 800 },
   });
+  return { browser, isVercel: false };
 }
 
 export async function scrape(url: string): Promise<ScrapeResult> {
   let browser: any = null;
 
   try {
-    browser = await getBrowser();
+    const { browser: b, isVercel } = await getBrowser();
+    browser = b;
     const page = await browser.newPage();
+
+    // On Vercel, apply manual stealth evasions (replaces stealth plugin)
+    if (isVercel) {
+      await applyStealthEvasions(page);
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      );
+    }
+
     await page.setViewport({ width: 1280, height: 800 });
     await page.setRequestInterception(true);
 
@@ -141,10 +205,10 @@ export async function scrape(url: string): Promise<ScrapeResult> {
       if (!isItem) return;
       try {
         const json = await response.json();
-        const data = json.data ?? json;
-        extractFromData(data);
-        if (data.item_detail) extractFromData(data.item_detail);
-        if (data.item) extractFromData(data.item);
+        const d = json.data ?? json;
+        extractFromData(d);
+        if (d.item_detail) extractFromData(d.item_detail);
+        if (d.item) extractFromData(d.item);
       } catch { /* not JSON */ }
     });
 
@@ -154,6 +218,7 @@ export async function scrape(url: string): Promise<ScrapeResult> {
     try { await page.waitForSelector('img[src*="susercontent"]', { timeout: 10000 }); }
     catch { /* best effort */ }
 
+    // Parse embedded JSON data from script tags
     try {
       const embedded: string[] = await page.evaluate(() => {
         const out: string[] = [];
@@ -178,12 +243,14 @@ export async function scrape(url: string): Promise<ScrapeResult> {
       embedded.forEach((v) => apiVideoUrls.push(v));
     } catch { /* best effort */ }
 
+    // Click first image to trigger carousel + video loads
     await page.evaluate(() => {
       const imgs = Array.from(document.querySelectorAll('img[src*="susercontent"]'));
       if (imgs[0]) (imgs[0] as HTMLElement).click();
     });
     await new Promise((r) => setTimeout(r, 2000));
 
+    // Try clicking video and carousel elements
     await page.evaluate(() => {
       document.querySelectorAll('video, [class*="play"], [class*="video-player"], [aria-label*="video"]')
         .forEach((el: any) => { try { el.click(); } catch {} });
@@ -192,12 +259,14 @@ export async function scrape(url: string): Promise<ScrapeResult> {
     });
     await new Promise((r) => setTimeout(r, 3000));
 
+    // Collect DOM images
     const domImgs: string[] = await page.evaluate(() =>
       Array.from(document.querySelectorAll('img[src*="susercontent"]'))
         .map((i: any) => i.src).filter((s: string) => s.includes("/file/"))
     );
     for (const img of domImgs) { const u = fullSize(img); if (!isJunk(u)) images.add(u); }
 
+    // Collect DOM videos
     const domVids: string[] = await page.evaluate(() =>
       Array.from(document.querySelectorAll("video, video source"))
         .map((el: any) => el.src || el.getAttribute("src") || "")
