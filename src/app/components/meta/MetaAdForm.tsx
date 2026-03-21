@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Image as ImageIcon, Loader2, Upload, ImagePlus, Video, HelpCircle } from "lucide-react";
 import { META_CALL_TO_ACTIONS } from "@/lib/meta-ads-constants";
 import { MetaFormLabel } from "@/app/components/meta/MetaFormLabel";
+import MetaSearchablePicker from "@/app/components/meta/MetaSearchablePicker";
+import ShopeeLinkHistoryPickButton from "@/app/components/shopee/ShopeeLinkHistoryPickButton";
 
 type Page = { id: string; name: string };
+type Pixel = { id: string; name: string };
 type LibraryImage = { hash: string; url: string | null; id: string | null };
 type LibraryVideo = { id: string; title: string; source: string | null; length: number | null; picture: string | null };
 
@@ -19,6 +22,8 @@ export type MetaAdFormBody = {
   image_hash?: string;
   image_url?: string;
   video_id?: string;
+  /** Pixel no anúncio (tracking_specs) — útil em tráfego sem conversão no conjunto. */
+  tracking_pixel_id?: string;
 };
 
 type Props = {
@@ -74,6 +79,18 @@ export default function MetaAdForm({
   const [libraryVideos, setLibraryVideos] = useState<LibraryVideo[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [pixels, setPixels] = useState<Pixel[]>([]);
+  const [trackingPixelId, setTrackingPixelId] = useState("");
+
+  const pagePickerOptions = useMemo(() => pages.map((p) => ({ value: p.id, label: p.name })), [pages]);
+  const ctaPickerOptions = useMemo(
+    () => META_CALL_TO_ACTIONS.map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
+  const pixelPickerOptions = useMemo(
+    () => pixels.map((p) => ({ value: p.id, label: p.name || "Pixel", description: p.id })),
+    [pixels]
+  );
 
   useEffect(() => {
     if (!adAccountId) return;
@@ -102,6 +119,18 @@ export default function MetaAdForm({
     }).catch(() => {});
   }, [adAccountId]);
 
+  useEffect(() => {
+    if (!adAccountId || isEditMode) return;
+    let cancelled = false;
+    fetch(`/api/meta/pixels?ad_account_id=${encodeURIComponent(adAccountId)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.pixels) setPixels(json.pixels);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [adAccountId, isEditMode]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const hasImage = imageHash.trim() || imageUrl.trim();
@@ -122,6 +151,7 @@ export default function MetaAdForm({
       ...(mediaType === "video"
         ? { video_id: videoId, image_hash: imageHash || undefined, image_url: imageUrl || undefined }
         : { image_hash: imageHash || undefined, image_url: imageUrl || undefined }),
+      ...(!isEditMode && trackingPixelId.trim() ? { tracking_pixel_id: trackingPixelId.trim() } : {}),
     });
   };
 
@@ -156,21 +186,21 @@ export default function MetaAdForm({
       <div className="flex-1 min-h-0 max-md:max-h-[min(70dvh,560px)] max-md:overflow-y-auto max-md:scrollbar-shopee max-md:pr-1 md:overflow-visible space-y-3 md:space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-2 md:gap-3 gap-3">
           <div>
-            <MetaFormLabel htmlFor="ad-page">Página do Facebook</MetaFormLabel>
+            <MetaFormLabel htmlFor="ad-page-open">Página do Facebook</MetaFormLabel>
             {loadingPages ? (
               <p className="text-xs text-text-secondary">Carregando páginas...</p>
             ) : (
-              <select
-                id="ad-page"
+              <MetaSearchablePicker
                 value={pageId}
-                onChange={(e) => setPageId(e.target.value)}
-                className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-              >
-                <option value="">Selecione a página</option>
-                {pages.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={setPageId}
+                options={pagePickerOptions}
+                modalTitle="Página do Facebook"
+                searchPlaceholder="Filtrar páginas…"
+                emptyButtonLabel="Buscar e selecionar página"
+                disabled={pages.length === 0}
+                emptyOptionsMessage="Nenhuma página na conta."
+                openButtonId="ad-page-open"
+              />
             )}
             {!loadingPages && pages.length === 0 && adAccountId && (
               <p className="text-[10px] text-amber-500 mt-1">Nenhuma página na conta. Vincule no Meta.</p>
@@ -192,18 +222,21 @@ export default function MetaAdForm({
         <div>
           <MetaFormLabel
             htmlFor="ad-link"
-            hint="Opcional. Você pode gerar ou colar o link depois no ATI."
+            hint="Opcional. Use a lupa para escolher um link do histórico do Gerador Shopee (já com afiliado e sub-IDs)."
           >
             Link de destino
           </MetaFormLabel>
-          <input
-            id="ad-link"
-            type="url"
-            value={adLink}
-            onChange={(e) => setAdLink(e.target.value)}
-            placeholder="https:// ou deixe em branco"
-            className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm placeholder-text-secondary/60"
-          />
+          <div className="flex gap-2 items-center">
+            <input
+              id="ad-link"
+              type="url"
+              value={adLink}
+              onChange={(e) => setAdLink(e.target.value)}
+              placeholder="https:// ou deixe em branco"
+              className="flex-1 min-w-0 rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm placeholder-text-secondary/60"
+            />
+            <ShopeeLinkHistoryPickButton onPick={setAdLink} />
+          </div>
         </div>
         <div>
           <MetaFormLabel
@@ -236,17 +269,16 @@ export default function MetaAdForm({
             />
           </div>
           <div>
-            <MetaFormLabel htmlFor="ad-cta">Chamada para ação</MetaFormLabel>
-            <select
-              id="ad-cta"
+            <MetaFormLabel htmlFor="ad-cta-open">Chamada para ação</MetaFormLabel>
+            <MetaSearchablePicker
               value={callToAction}
-              onChange={(e) => setCallToAction(e.target.value)}
-              className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-            >
-              {META_CALL_TO_ACTIONS.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+              onChange={setCallToAction}
+              options={ctaPickerOptions}
+              modalTitle="Chamada para ação"
+              searchPlaceholder="Filtrar CTAs…"
+              emptyButtonLabel="Escolher chamada para ação"
+              openButtonId="ad-cta-open"
+            />
           </div>
         </div>
 
@@ -441,6 +473,32 @@ export default function MetaAdForm({
           </div>
         </div>
       )}
+
+        {!isEditMode && (
+          <div className="rounded-lg border border-dark-border/60 bg-dark-bg/20 p-2.5 md:p-3 space-y-2">
+            <MetaFormLabel
+              htmlFor="ad-tracking-open"
+              hint="Opcional. Equivale a “Eventos do site” no rastreamento do Meta: o pixel é associado ao anúncio (não exige meta de conversão no conjunto)."
+            >
+              Rastreamento — pixel no anúncio (opcional)
+            </MetaFormLabel>
+            <MetaSearchablePicker
+              value={trackingPixelId}
+              onChange={setTrackingPixelId}
+              options={pixelPickerOptions}
+              modalTitle="Pixel de rastreamento no anúncio"
+              modalDescription="Opcional. Busque pelo nome ou ID do pixel."
+              searchPlaceholder="Filtrar pixels…"
+              emptyButtonLabel="Escolher pixel (opcional)"
+              emptyAsTag
+              emptyTagLabel="Nenhum"
+              allowClear
+              clearLabel="Sem pixel de rastreamento"
+              emptyOptionsMessage="Nenhum pixel nesta conta."
+              openButtonId="ad-tracking-open"
+            />
+          </div>
+        )}
 
       </div>
 

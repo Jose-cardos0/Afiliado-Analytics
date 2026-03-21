@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Target, Loader2, Zap, HelpCircle } from "lucide-react";
 import { MetaFormLabel } from "@/app/components/meta/MetaFormLabel";
+import MetaCountryPicker from "@/app/components/meta/MetaCountryPicker";
+import MetaSearchablePicker from "@/app/components/meta/MetaSearchablePicker";
 import {
-  META_COUNTRIES,
   META_PUBLISHER_PLATFORMS,
   META_SALES_CONVERSION_EVENTS,
+  META_PIXEL_CONVERSION_EVENTS,
+  META_GENDER_OPTIONS,
   getOptimizationGoalsForObjective,
   getDefaultGoalForObjective,
 } from "@/lib/meta-ads-constants";
@@ -16,7 +19,10 @@ type Pixel = { id: string; name: string };
 export type MetaAdSetFormBody = {
   name: string;
   daily_budget: number;
-  country_code: string;
+  /** Países do público (API: geo_locations.countries). */
+  country_codes: string[];
+  /** @deprecated use country_codes; mantido para compat. */
+  country_code?: string;
   age_min: number;
   age_max: number;
   gender: "all" | "male" | "female";
@@ -32,6 +38,8 @@ type Props = {
   campaignName?: string;
   defaultName?: string;
   defaultBudget?: string;
+  /** Lista de países (ex.: edição de conjunto com vários países). */
+  defaultCountryCodes?: string[];
   defaultCountry?: string;
   defaultAgeMin?: string;
   defaultAgeMax?: string;
@@ -58,6 +66,7 @@ export default function MetaAdSetForm({
   campaignName,
   defaultName = "",
   defaultBudget = "10",
+  defaultCountryCodes,
   defaultCountry = "BR",
   defaultAgeMin = "18",
   defaultAgeMax = "65",
@@ -74,7 +83,10 @@ export default function MetaAdSetForm({
 }: Props) {
   const [name, setName] = useState(defaultName);
   const [dailyBudget, setDailyBudget] = useState(defaultBudget);
-  const [countryCode, setCountryCode] = useState(defaultCountry);
+  const [countryCodes, setCountryCodes] = useState<string[]>(() =>
+    defaultCountryCodes?.length ? [...new Set(defaultCountryCodes.map((c) => String(c).toUpperCase().slice(0, 2)))].filter((c) => c.length === 2)
+      : [defaultCountry]
+  );
   const [ageMin, setAgeMin] = useState(defaultAgeMin);
   const [ageMax, setAgeMax] = useState(defaultAgeMax);
   const [gender, setGender] = useState<"all" | "male" | "female">(defaultGender);
@@ -104,6 +116,37 @@ export default function MetaAdSetForm({
   const isSales = campaignObjective === "OUTCOME_SALES";
   const allowedGoals = getOptimizationGoalsForObjective(campaignObjective ?? "OUTCOME_TRAFFIC");
   const goalOk = isSales || allowedGoals.some((o) => o.value === optimizationGoal);
+
+  const pixelPickerOptions = useMemo(
+    () => pixels.map((p) => ({ value: p.id, label: p.name || "Pixel", description: p.id })),
+    [pixels]
+  );
+  const salesConversionPickerOptions = useMemo(
+    () => META_SALES_CONVERSION_EVENTS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const pixelConversionPickerOptions = useMemo(
+    () => META_PIXEL_CONVERSION_EVENTS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const optimizationGoalPickerOptions = useMemo(
+    () => allowedGoals.map((o) => ({ value: o.value, label: o.label })),
+    [allowedGoals]
+  );
+  const genderPickerOptions = useMemo(
+    () => META_GENDER_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+
+  const displayOptimizationGoal = goalOk ? optimizationGoal : getDefaultGoalForObjective(campaignObjective ?? "OUTCOME_TRAFFIC");
+
+  const handleOptimizationGoalPick = useCallback((v: string) => {
+    setOptimizationGoal(v);
+    if (!["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(v)) {
+      setPixelId("");
+      setConversionEvent("PURCHASE");
+    }
+  }, []);
 
   useEffect(() => {
     if (campaignObjective == null) return;
@@ -139,10 +182,12 @@ export default function MetaAdSetForm({
     const pubList = META_PUBLISHER_PLATFORMS.map((p) => p.value).filter((p) => publisherPlatforms[p]);
     if (pubList.length === 0) return;
     if (isSales && (!pixelId.trim() || !["PURCHASE", "ADD_TO_CART"].includes(conversionEvent))) return;
+    const codes = countryCodes.length > 0 ? countryCodes : ["BR"];
     onSubmit({
       name: name.trim(),
       daily_budget: budgetCents,
-      country_code: countryCode,
+      country_codes: codes,
+      country_code: codes[0],
       age_min: parseInt(ageMin, 10) || 18,
       age_max: parseInt(ageMax, 10) || 65,
       gender,
@@ -218,35 +263,33 @@ export default function MetaAdSetForm({
           <div className="rounded-lg border border-dark-border/60 bg-dark-bg/20 p-2.5 md:p-3 space-y-2">
             <div>
               <MetaFormLabel
-                htmlFor="adset-pixel-sales"
+                htmlFor="adset-pixel-sales-open"
                 hint="Campanha de vendas: otimização para compras ou carrinho no site. Pixel obrigatório."
               >
                 Pixel
               </MetaFormLabel>
-              <select
-                id="adset-pixel-sales"
+              <MetaSearchablePicker
                 value={pixelId}
-                onChange={(e) => setPixelId(e.target.value)}
-                className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-              >
-                <option value="">Selecione o pixel</option>
-                {pixels.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name || p.id}</option>
-                ))}
-              </select>
+                onChange={setPixelId}
+                options={pixelPickerOptions}
+                modalTitle="Pixel"
+                searchPlaceholder="Filtrar pixels…"
+                emptyButtonLabel="Buscar e selecionar pixel"
+                emptyOptionsMessage="Nenhum pixel nesta conta."
+                openButtonId="adset-pixel-sales-open"
+              />
             </div>
             <div>
-              <MetaFormLabel htmlFor="adset-conv-sales">Evento para otimizar</MetaFormLabel>
-              <select
-                id="adset-conv-sales"
+              <MetaFormLabel htmlFor="adset-conv-sales-open">Evento para otimizar</MetaFormLabel>
+              <MetaSearchablePicker
                 value={conversionEvent}
-                onChange={(e) => setConversionEvent(e.target.value)}
-                className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-              >
-                {META_SALES_CONVERSION_EVENTS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+                onChange={setConversionEvent}
+                options={salesConversionPickerOptions}
+                modalTitle="Evento para otimizar"
+                searchPlaceholder="Filtrar…"
+                emptyButtonLabel="Escolher evento"
+                openButtonId="adset-conv-sales-open"
+              />
             </div>
           </div>
         </>
@@ -254,56 +297,48 @@ export default function MetaAdSetForm({
         <>
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1">Meta de desempenho</label>
-            <select
-              value={goalOk ? optimizationGoal : getDefaultGoalForObjective(campaignObjective)}
-              onChange={(e) => {
-                const v = e.target.value;
-                setOptimizationGoal(v);
-                if (!["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(v)) {
-                  setPixelId("");
-                  setConversionEvent("PURCHASE");
-                }
-              }}
-              className="w-full rounded-md border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm"
-            >
-              {allowedGoals.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <MetaSearchablePicker
+              value={displayOptimizationGoal}
+              onChange={handleOptimizationGoalPick}
+              options={optimizationGoalPickerOptions}
+              modalTitle="Meta de desempenho"
+              searchPlaceholder="Filtrar metas…"
+              emptyButtonLabel="Escolher meta"
+            />
           </div>
-          {["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(goalOk ? optimizationGoal : getDefaultGoalForObjective(campaignObjective)) && (
+          {["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(
+            goalOk ? optimizationGoal : getDefaultGoalForObjective(campaignObjective ?? "OUTCOME_TRAFFIC")
+          ) && (
             <>
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1">Conjunto de dados (Pixel)</label>
-                <select
+                <MetaSearchablePicker
                   value={pixelId}
-                  onChange={(e) => setPixelId(e.target.value)}
-                  className="w-full rounded-md border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm"
-                >
-                  <option value="">Nenhum</option>
-                  {pixels.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name || p.id}</option>
-                  ))}
-                </select>
+                  onChange={setPixelId}
+                  options={pixelPickerOptions}
+                  modalTitle="Conjunto de dados (Pixel)"
+                  searchPlaceholder="Filtrar pixels…"
+                  emptyButtonLabel="Buscar pixel"
+                  emptyAsTag
+                  emptyTagLabel="Nenhum"
+                  allowClear
+                  clearLabel="Nenhum"
+                  emptyOptionsMessage="Nenhum pixel nesta conta."
+                />
               </div>
-              {pixelId && (
+              {pixelId ? (
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">Evento de conversão</label>
-                  <select
+                  <MetaSearchablePicker
                     value={conversionEvent}
-                    onChange={(e) => setConversionEvent(e.target.value)}
-                    className="w-full rounded-md border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm"
-                  >
-                    <option value="PURCHASE">Comprar</option>
-                    <option value="ADD_TO_CART">Adicionar ao carrinho</option>
-                    <option value="LEAD">Lead</option>
-                    <option value="COMPLETE_REGISTRATION">Cadastro completo</option>
-                    <option value="INITIATE_CHECKOUT">Iniciar checkout</option>
-                    <option value="VIEW_CONTENT">Visualizar conteúdo</option>
-                    <option value="PAGE_VIEW">Visualização de página</option>
-                  </select>
+                    onChange={setConversionEvent}
+                    options={pixelConversionPickerOptions}
+                    modalTitle="Evento de conversão"
+                    searchPlaceholder="Filtrar eventos…"
+                    emptyButtonLabel="Escolher evento"
+                  />
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </>
@@ -335,34 +370,38 @@ export default function MetaAdSetForm({
         </button>
       </div>
 
+      <div className="rounded-lg border border-dark-border/60 bg-dark-bg/20 p-2.5 md:p-3 space-y-2">
+        <MetaFormLabel
+          htmlFor="adset-countries-open"
+          hint="Pesquise no modal, marque os países e confirme. Eles aparecem como tags laranja, no mesmo espírito das plataformas."
+        >
+          Países (público)
+        </MetaFormLabel>
+        <p className="text-[11px] text-text-secondary/80 -mt-1 mb-1">
+          Mínimo 1, máximo 25. Use o botão para abrir a busca e escolher vários países.
+        </p>
+        <MetaCountryPicker
+          value={countryCodes}
+          onChange={setCountryCodes}
+          max={25}
+          openButtonId="adset-countries-open"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-2 md:items-end">
-        <div className="md:col-span-4">
-          <MetaFormLabel htmlFor="adset-country">País</MetaFormLabel>
-          <select
-            id="adset-country"
-            value={countryCode}
-            onChange={(e) => setCountryCode(e.target.value)}
-            className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-          >
-            {META_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
-            ))}
-          </select>
-        </div>
-        <div className="md:col-span-4">
-          <MetaFormLabel htmlFor="adset-gender">Gênero</MetaFormLabel>
-          <select
-            id="adset-gender"
+        <div className="md:col-span-6">
+          <MetaFormLabel htmlFor="adset-gender-open">Gênero</MetaFormLabel>
+          <MetaSearchablePicker
             value={gender}
-            onChange={(e) => setGender(e.target.value as "all" | "male" | "female")}
-            className="w-full rounded-md border border-dark-border bg-dark-bg py-1.5 md:py-2 px-3 text-text-primary text-sm"
-          >
-            <option value="all">Todos</option>
-            <option value="male">Masculino</option>
-            <option value="female">Feminino</option>
-          </select>
+            onChange={(v) => setGender(v as "all" | "male" | "female")}
+            options={genderPickerOptions}
+            modalTitle="Gênero do público"
+            searchPlaceholder="Filtrar…"
+            emptyButtonLabel="Escolher gênero"
+            openButtonId="adset-gender-open"
+          />
         </div>
-        <div className="md:col-span-4 flex gap-2">
+        <div className="md:col-span-6 flex gap-2">
           <div className="flex-1 min-w-0">
             <MetaFormLabel htmlFor="adset-age-min">Idade mín.</MetaFormLabel>
             <input

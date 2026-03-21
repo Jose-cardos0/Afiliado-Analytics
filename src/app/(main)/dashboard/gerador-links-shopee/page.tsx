@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  Link2, Sparkles, Trash2, Search, ExternalLink, ShoppingBag,
+  Link2, Sparkles, Trash2, Search, ExternalLink,
   Hand, ListPlus, AlertCircle, Loader2, ChevronLeft, ChevronRight,
-  ImageIcon, Share2, Copy, MessageCircle, Download, TrendingUp, X,
+  ImageIcon, Copy, TrendingUp, X,
   Plus, Info, Zap, Star, Tag, CheckCircle2, Check,
 } from "lucide-react";
 import Link from "next/link";
@@ -140,12 +140,6 @@ export default function GeradorLinksShopeePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [lastGeneratedLink, setLastGeneratedLink] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
-  const [storyCaption, setStoryCaption] = useState("");
-  const [captionLoading, setCaptionLoading] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState("");
-  const [generatedStoryImage, setGeneratedStoryImage] = useState<string | null>(null);
-  const [storyImageLoading, setStoryImageLoading] = useState(false);
-  const [storyImageUseGenerated, setStoryImageUseGenerated] = useState(false);
   const [convertLoading, setConvertLoading] = useState(false);
   const [products, setProducts] = useState<ProductOffer[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductOffer | null>(null);
@@ -173,7 +167,6 @@ export default function GeradorLinksShopeePage() {
   const [selectedListaId, setSelectedListaId] = useState<string | null>(null);
   const [addToListLoading, setAddToListLoading] = useState(false);
   const [hasApiKeys, setHasApiKeys] = useState<boolean | null>(null);
-  const [whatsappSharing, setWhatsappSharing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const configCardRef = useRef<HTMLDivElement>(null);
   const handleSearchRef = useRef<(term?: string) => Promise<void>>(() => Promise.resolve());
@@ -264,7 +257,7 @@ export default function GeradorLinksShopeePage() {
 
   handleSearchRef.current = handleSearch;
 
-  useEffect(() => { setGeneratedStoryImage(null); setStoryImageUseGenerated(false); setLastGeneratedLink(""); setStoryCaption(""); }, [selectedProduct?.itemId]);
+  useEffect(() => { setLastGeneratedLink(""); }, [selectedProduct?.itemId]);
 
   const handleSelectProduct = useCallback(async (product: ProductOffer) => {
     setSelectedProduct(product); setProducts([]);
@@ -333,86 +326,6 @@ export default function GeradorLinksShopeePage() {
     } catch (e) { setError(e instanceof Error ? e.message : "Erro ao listar mais vendidos"); }
     finally { setLoadingBestSellers(false); }
   }, [hasApiKeys, bestSellerKeyword]);
-
-  const handleGenerateStoryImage = useCallback(async () => {
-    if (!selectedProduct?.imageUrl) return;
-    setStoryImageLoading(true); setGeneratedStoryImage(null); setStoryImageUseGenerated(false);
-    try {
-      const res = await fetch("/api/shopee/generate-story-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: selectedProduct.imageUrl, productName: selectedProduct.productName ?? "" }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Erro ao gerar imagem");
-      setGeneratedStoryImage(data?.imageBase64 ? `data:image/png;base64,${data.imageBase64}` : data?.imageUrl ?? null);
-    } catch (e) { setError(e instanceof Error ? e.message : "Erro ao gerar imagem"); }
-    finally { setStoryImageLoading(false); }
-  }, [selectedProduct]);
-
-  const handleGenerateCaption = useCallback(async () => {
-    if (!selectedProduct?.productName) return;
-    setCaptionLoading(true); setShareFeedback("");
-    try {
-      const res = await fetch("/api/shopee/generate-caption", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productName: selectedProduct.productName }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Erro ao gerar legenda");
-      setStoryCaption(data?.caption ?? "");
-    } catch (e) { setError(e instanceof Error ? e.message : "Erro ao gerar legenda"); }
-    finally { setCaptionLoading(false); }
-  }, [selectedProduct]);
-
-  const getSelectedImageFile = useCallback(async (): Promise<File | null> => {
-    const url = storyImageUseGenerated && generatedStoryImage ? generatedStoryImage : selectedProduct?.imageUrl;
-    if (!url) return null;
-    try {
-      let blob: Blob;
-      if (url.startsWith("data:")) { const res = await fetch(url); blob = await res.blob(); }
-      else { const res = await fetch(`/api/shopee/proxy-image?url=${encodeURIComponent(url)}`); if (!res.ok) return null; blob = await res.blob(); }
-      if (!blob || blob.size === 0) return null;
-      const type = blob.type && blob.type.startsWith("image/") ? blob.type : "image/jpeg";
-      return new File([blob], "story-shopee.jpg", { type });
-    } catch { return null; }
-  }, [storyImageUseGenerated, generatedStoryImage, selectedProduct?.imageUrl]);
-
-  const handleShareStory = useCallback(async () => {
-    if (!lastGeneratedLink) { setShareFeedback('Converte o link primeiro (botão "Converter Link").'); return; }
-    try { await navigator.clipboard.writeText(lastGeneratedLink); } catch { setShareFeedback("Não foi possível copiar o link. Copie manualmente."); return; }
-    const imageFile = await getSelectedImageFile();
-    const canShare = typeof navigator !== "undefined" && navigator.share;
-    const canShareFiles = imageFile && (navigator as { canShare?: (x: { files?: File[] }) => boolean }).canShare?.({ files: [imageFile] });
-    if (canShare && canShareFiles) {
-      try { await navigator.share({ files: [imageFile], title: "Story Shopee" }); setShareFeedback("Link copiado! Escolha Instagram → Stories e cole o link no sticker."); }
-      catch (err) { if ((err as Error)?.name !== "AbortError") { setShareFeedback('Link copiado! Use "Baixar imagem" e cole no Stories.'); if (typeof window !== "undefined") window.open("https://www.instagram.com/", "_blank", "noopener"); } }
-    } else { setShareFeedback('Link copiado! Use "Baixar imagem" e cole no Instagram Stories.'); if (typeof window !== "undefined") window.open("https://www.instagram.com/", "_blank", "noopener"); }
-    setTimeout(() => setShareFeedback(""), 9000);
-  }, [lastGeneratedLink, getSelectedImageFile]);
-
-  const handleShareWhatsApp = useCallback(async () => {
-    if (!lastGeneratedLink) { setShareFeedback('Converta o link primeiro.'); return; }
-    setWhatsappSharing(true);
-    const link = lastGeneratedLink;
-    const legenda = storyCaption.trim();
-    let textAsCaption = !legenda ? `Comprar agora: ${link}` : /\{Link do Converter Link\}|\{link\}/i.test(legenda) ? legenda.replace(/\{Link do Converter Link\}|\{link\}/i, link) : (() => { const lines = legenda.split("\n"); const title = lines[0]?.trim() ?? ""; const rest = lines.slice(1).join("\n").trim(); return rest ? `${title}\n\nComprar agora: ${link}\n\n${rest}` : `${title}\n\nComprar agora: ${link}`; })();
-    const linesAll = textAsCaption.split("\n");
-    textAsCaption = (linesAll.length > 10 ? linesAll.slice(0, 10).join("\n") : textAsCaption).slice(0, 700).trim();
-    try { await navigator.clipboard.writeText(textAsCaption); } catch { /**/ }
-    const imageFile = await getSelectedImageFile();
-    const canShare = typeof navigator !== "undefined" && navigator.share;
-    const canShareFiles = imageFile && (navigator as { canShare?: (x: { files?: File[] }) => boolean }).canShare?.({ files: [imageFile] });
-    if (canShare && canShareFiles) {
-      try { await navigator.share({ files: [imageFile], title: "Story Shopee" }); setShareFeedback("Legenda copiada! Cole no WhatsApp Status."); }
-      catch (err) { if ((err as Error)?.name !== "AbortError") { setShareFeedback('Legenda copiada! Use "Baixar imagem" e compartilhe no WhatsApp.'); window.open(`https://wa.me/?text=${encodeURIComponent(textAsCaption)}`, "_blank", "noopener"); } }
-    } else { window.open(`https://wa.me/?text=${encodeURIComponent(textAsCaption)}`, "_blank", "noopener"); setShareFeedback('Legenda copiada! Use "Baixar imagem" e cole no WhatsApp.'); }
-    setTimeout(() => setShareFeedback(""), 9000);
-    setWhatsappSharing(false);
-  }, [lastGeneratedLink, storyCaption, getSelectedImageFile]);
-
-  const handleDownloadStoryImage = useCallback(async () => {
-    const url = storyImageUseGenerated && generatedStoryImage ? generatedStoryImage : selectedProduct?.imageUrl;
-    if (!url) return;
-    try {
-      if (url.startsWith("data:")) { const a = document.createElement("a"); a.href = url; a.download = "story-shopee.jpg"; a.click(); }
-      else { const res = await fetch(url, { mode: "cors" }); const blob = await res.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "story-shopee.jpg"; a.click(); URL.revokeObjectURL(a.href); }
-      setShareFeedback("Imagem baixada! Anexe no WhatsApp ou no Story do Instagram."); setTimeout(() => setShareFeedback(""), 4000);
-    } catch { const a = document.createElement("a"); a.href = url; a.download = "story-shopee.jpg"; a.target = "_blank"; a.rel = "noopener"; a.click(); setShareFeedback("Imagem aberta em nova aba. Salve com botão direito."); setTimeout(() => setShareFeedback(""), 5000); }
-  }, [storyImageUseGenerated, generatedStoryImage, selectedProduct?.imageUrl]);
 
   const handleDeleteHistory = useCallback(async (id: string) => {
     try { const res = await fetch(`/api/shopee/link-history?id=${encodeURIComponent(id)}`, { method: "DELETE" }); if (!res.ok) throw new Error("Erro ao excluir"); await loadHistory(historyPage, historySearchDebounced); } catch { /**/ }
@@ -738,120 +651,6 @@ export default function GeradorLinksShopeePage() {
         </div>
       </div>
 
-      {/* ─── STORIES ──────────────────────────────────────────────────────────── */}
-      {selectedProduct && (
-        <div className="bg-dark-card rounded-xl border border-dark-border p-5">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="p-1.5 rounded-lg bg-shopee-orange/10">
-              <ImageIcon className="h-4 w-4 text-shopee-orange" />
-            </div>
-            <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Preparar para Stories</h2>
-            {!lastGeneratedLink && (
-              <span className="ml-auto flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-                <AlertCircle className="h-3 w-3" /> Converta o link primeiro
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Imagens */}
-            <div className="shrink-0 space-y-3">
-              <div className="flex gap-4">
-                {/* Imagem Shopee */}
-                <div className="flex flex-col gap-2 items-center">
-                  <span className="text-[11px] text-text-secondary font-medium">Original</span>
-                  <button type="button" onClick={() => setStoryImageUseGenerated(false)}
-                    className={`w-[110px] aspect-[9/16] rounded-xl overflow-hidden transition-all ${!storyImageUseGenerated ? "ring-2 ring-shopee-orange" : "ring-1 ring-dark-border hover:ring-shopee-orange/40"}`}>
-                    {selectedProduct.imageUrl
-                      ? <img src={selectedProduct.imageUrl} alt="" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full bg-dark-bg flex items-center justify-center"><ImageIcon className="h-6 w-6 text-text-secondary/30" /></div>
-                    }
-                  </button>
-                  {!storyImageUseGenerated && <span className="text-[10px] text-shopee-orange font-medium">✓ Em uso</span>}
-                </div>
-
-                {/* Imagem IA */}
-                <div className="flex flex-col gap-2 items-center">
-                  <span className="text-[11px] text-text-secondary font-medium">IA gerada</span>
-                  {storyImageLoading ? (
-                    <div className="w-[110px] aspect-[9/16] rounded-xl border border-dashed border-dark-border bg-dark-bg flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2"><Loader2 className="h-6 w-6 animate-spin text-shopee-orange" /><span className="text-[10px] text-text-secondary">Gerando...</span></div>
-                    </div>
-                  ) : generatedStoryImage ? (
-                    <>
-                      <button type="button" onClick={() => setStoryImageUseGenerated(true)}
-                        className={`w-[110px] aspect-[9/16] rounded-xl overflow-hidden transition-all ${storyImageUseGenerated ? "ring-2 ring-shopee-orange" : "ring-1 ring-dark-border hover:ring-shopee-orange/40"}`}>
-                        <img src={generatedStoryImage} alt="" className="w-full h-full object-cover" />
-                      </button>
-                      {storyImageUseGenerated && <span className="text-[10px] text-shopee-orange font-medium">✓ Em uso</span>}
-                    </>
-                  ) : (
-                    <div className="w-[110px] aspect-[9/16] rounded-xl border border-dashed border-dark-border bg-dark-bg flex items-center justify-center">
-                      <span className="text-[10px] text-text-secondary/60 text-center px-2">Clique em Gerar</span>
-                    </div>
-                  )}
-                  <button type="button" onClick={handleGenerateStoryImage} disabled={storyImageLoading || !selectedProduct?.imageUrl}
-                    className="text-[11px] px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg text-text-secondary hover:border-shopee-orange/50 hover:text-shopee-orange disabled:opacity-40 transition-colors inline-flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> Gerar IA
-                  </button>
-                </div>
-              </div>
-
-              {/* Botões download */}
-              <button type="button" onClick={handleDownloadStoryImage} disabled={!selectedProduct?.imageUrl && !generatedStoryImage}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dark-border bg-dark-bg text-text-secondary hover:border-shopee-orange/50 hover:text-shopee-orange disabled:opacity-40 transition-colors text-sm">
-                <Download className="h-4 w-4" /> Baixar imagem
-              </button>
-            </div>
-
-            {/* Legenda + ações de share */}
-            <div className="flex-1 min-w-0 space-y-3">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-xs font-medium text-text-secondary">Legenda para o Story</span>
-                  <Tooltip text="Status WhatsApp: máx. 700 caracteres e 10 linhas. A legenda é cortada automaticamente ao compartilhar." wide />
-                </div>
-                <textarea value={storyCaption} onChange={(e) => setStoryCaption(e.target.value)}
-                  placeholder='Clique em "Gerar legenda" para criar uma legenda de venda com IA...'
-                  rows={6}
-                  className="w-full px-3 py-2.5 rounded-lg border border-dark-border bg-dark-bg text-text-primary text-sm placeholder-text-secondary/40 focus:outline-none focus:border-shopee-orange resize-y scrollbar-shopee transition-all"
-                />
-              </div>
-
-              {/* Botões de compartilhamento */}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={handleGenerateCaption} disabled={captionLoading || !selectedProduct?.productName}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-shopee-orange text-white font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity text-sm">
-                  {captionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Gerar legenda
-                </button>
-                <button type="button" onClick={handleShareStory} disabled={!lastGeneratedLink}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${lastGeneratedLink ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 shadow-lg shadow-pink-500/20" : "bg-dark-bg border border-dark-border text-text-secondary/50 cursor-not-allowed"}`}>
-                  <Share2 className="h-4 w-4" /> Instagram
-                </button>
-                <button type="button" onClick={handleShareWhatsApp} disabled={!lastGeneratedLink || whatsappSharing}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all text-sm ${lastGeneratedLink && !whatsappSharing ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-500/20" : "bg-dark-bg border border-dark-border text-text-secondary/50 cursor-not-allowed"}`}>
-                  {whatsappSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                  WhatsApp
-                </button>
-              </div>
-
-              {shareFeedback && (
-                <div className="flex items-start gap-2 p-3 bg-emerald-500/8 border border-emerald-500/20 rounded-lg">
-                  <Copy className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-emerald-400">{shareFeedback}</p>
-                </div>
-              )}
-
-              <p className="text-[11px] text-text-secondary/60 leading-relaxed">
-                <strong className="text-text-secondary/80">Instagram:</strong> link copiado, envie a imagem e cole o link no sticker &quot;Adicionar link&quot; do Stories.{" "}
-                <strong className="text-text-secondary/80">WhatsApp:</strong> legenda copiada (com link), envie a imagem e cole a legenda no Status.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ─── HISTÓRICO ──────────────────────────────────────────────────────── */}
       <div className="bg-dark-card rounded-xl border border-dark-border p-5">
         {/* Toolbar */}
@@ -912,7 +711,7 @@ export default function GeradorLinksShopeePage() {
               <Link2 className="h-8 w-8 text-text-secondary/30" />
             </div>
             <p className="text-sm text-text-secondary">Nenhum link gerado ainda.</p>
-            <p className="text-xs text-text-secondary/60 mt-1">Use &quot;Converter Link&quot; para criar seu primeiro link de afiliado.</p>
+            <p className="text-xs text-text-secondary/60 mt-1">Use &quot;Gerar Link Afiliado&quot; para criar seu primeiro link.</p>
           </div>
         ) : (
           <>

@@ -46,6 +46,29 @@ function defaultGoalForObjective(objective: string): string {
 
 const VALID_PUBLISHER_PLATFORMS = new Set(["facebook", "instagram", "audience_network", "messenger"]);
 
+/** Máximo de países por conjunto (API do Meta aceita vários em geo_locations.countries). */
+const MAX_TARGET_COUNTRIES = 25;
+
+/**
+ * Monta lista de códigos ISO 2 letras a partir de country_codes[] ou country_code legado.
+ */
+function parseCountryCodes(body: { country_codes?: unknown; country_code?: unknown }): string[] {
+  const out: string[] = [];
+  if (Array.isArray(body.country_codes)) {
+    for (const x of body.country_codes) {
+      const c = String(x).trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+      if (c.length === 2) out.push(c);
+    }
+  }
+  if (out.length === 0 && body.country_code != null && String(body.country_code).trim() !== "") {
+    const single = String(body.country_code).trim().toUpperCase().slice(0, 2);
+    if (/^[A-Z]{2}$/.test(single)) out.push(single);
+  }
+  const uniq = [...new Set(out)];
+  if (uniq.length === 0) uniq.push("BR");
+  return uniq.slice(0, MAX_TARGET_COUNTRIES);
+}
+
 function parsePublisherPlatforms(raw: unknown): string[] {
   if (!Array.isArray(raw) || raw.length === 0) return ["facebook", "instagram"];
   const list = raw
@@ -94,8 +117,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: json.error.message ?? "Erro ao buscar conjunto", meta_error: json.error }, { status: 500 });
     }
     const targeting = json.targeting;
-    const countries = targeting?.geo_locations?.countries;
-    const country_code = countries?.[0] ?? "BR";
+    const countries = targeting?.geo_locations?.countries?.filter(
+      (c): c is string => typeof c === "string" && /^[A-Z]{2}$/i.test(c)
+    );
+    const country_codes =
+      countries && countries.length > 0
+        ? [...new Set(countries.map((c) => c.toUpperCase().slice(0, 2)))].slice(0, MAX_TARGET_COUNTRIES)
+        : ["BR"];
+    const country_code = country_codes[0] ?? "BR";
     const genderNum = targeting?.genders?.[0];
     const gender = genderNum === 2 ? "female" : genderNum === 1 ? "male" : "all";
     const promoted = json.promoted_object;
@@ -105,6 +134,7 @@ export async function GET(req: Request) {
       name: json.name ?? "",
       daily_budget: json.daily_budget != null ? String(Number(json.daily_budget) / 100) : "10",
       country_code,
+      country_codes: country_codes,
       age_min: targeting?.age_min ?? 18,
       age_max: targeting?.age_max ?? 65,
       gender,
@@ -131,7 +161,10 @@ export async function PATCH(req: Request) {
     const daily_budget_raw = body?.daily_budget;
     // Front envia em centavos (ex: 700 = R$ 7). Usar como está; não multiplicar por 100.
     const daily_budget = daily_budget_raw != null ? (typeof daily_budget_raw === "number" ? Math.round(daily_budget_raw) : Math.round(Number(daily_budget_raw))) : undefined;
-    const country_code = (body?.country_code?.trim() || "BR").toUpperCase().slice(0, 2);
+    const country_codes = parseCountryCodes(body);
+    const hasExplicitCountryInput =
+      (Array.isArray(body?.country_codes) && body.country_codes.length > 0) ||
+      (body?.country_code != null && String(body.country_code).trim() !== "");
     const age_min = body?.age_min != null ? Number(body.age_min) : 18;
     const age_max = body?.age_max != null ? Number(body.age_max) : 65;
     const gender = body?.gender || "all";
@@ -141,7 +174,17 @@ export async function PATCH(req: Request) {
     if (conversion_event === "VIEW_CONTENT") conversion_event = "CONTENT_VIEW";
 
     if (!adset_id) return NextResponse.json({ error: "adset_id é obrigatório." }, { status: 400 });
-    if (!name && daily_budget === undefined && !optimization_goal && country_code === "BR" && age_min === 18 && age_max === 65 && gender === "all" && !pixel_id) {
+    if (
+      !name &&
+      daily_budget === undefined &&
+      !optimization_goal &&
+      !hasExplicitCountryInput &&
+      body?.age_min == null &&
+      body?.age_max == null &&
+      body?.gender == null &&
+      !pixel_id &&
+      body?.publisher_platforms == null
+    ) {
       return NextResponse.json({ error: "Informe ao menos um campo para editar (name, daily_budget, optimization_goal, targeting, pixel)." }, { status: 400 });
     }
     if (daily_budget !== undefined && (!Number.isFinite(daily_budget) || daily_budget < 100)) {
@@ -182,7 +225,7 @@ export async function PATCH(req: Request) {
     }
     const publisher_platforms = parsePublisherPlatforms(body?.publisher_platforms);
     const targeting: Record<string, unknown> = {
-      geo_locations: { countries: [country_code] },
+      geo_locations: { countries: country_codes },
       age_min,
       age_max,
       publisher_platforms,
@@ -256,7 +299,7 @@ export async function POST(req: Request) {
     const campaign_id = body?.campaign_id?.trim();
     const name = body?.name?.trim();
     const daily_budget = body?.daily_budget != null ? Number(body.daily_budget) : NaN;
-    const country_code = (body?.country_code?.trim() || "BR").toUpperCase().slice(0, 2);
+    const country_codes = parseCountryCodes(body);
     const age_min = body?.age_min != null ? Number(body.age_min) : 18;
     const age_max = body?.age_max != null ? Number(body.age_max) : 65;
     const gender = body?.gender || "all"; // all | male | female
@@ -314,7 +357,7 @@ export async function POST(req: Request) {
     const publisher_platforms = parsePublisherPlatforms(body?.publisher_platforms);
 
     const targeting: Record<string, unknown> = {
-      geo_locations: { countries: [country_code] },
+      geo_locations: { countries: country_codes },
       age_min,
       age_max,
       publisher_platforms,

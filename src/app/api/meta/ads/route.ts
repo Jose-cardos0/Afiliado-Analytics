@@ -101,6 +101,7 @@ export async function POST(req: Request) {
     const video_id = body?.video_id?.trim();
     const call_to_action = (body?.call_to_action?.trim() || "LEARN_MORE").toUpperCase();
     const title = body?.title?.trim() || "";
+    const tracking_pixel_id = body?.tracking_pixel_id?.trim();
 
     if (!ad_account_id || !adset_id || !name || !page_id || !message) {
       return NextResponse.json(
@@ -205,6 +206,13 @@ export async function POST(req: Request) {
       creative: JSON.stringify({ creative_id }),
       status: "PAUSED",
     });
+    /** Rastreamento “eventos do site” no nível do anúncio (como no Ads Manager em tráfego). */
+    if (tracking_pixel_id && /^\d+$/.test(tracking_pixel_id)) {
+      adParams.set(
+        "tracking_specs",
+        JSON.stringify([{ "action.type": ["offsite_conversion"], fb_pixel: [tracking_pixel_id] }])
+      );
+    }
     const adUrl = `${GRAPH_BASE}/${ad_account_id}/ads`;
     const adRes = await fetch(adUrl, {
       method: "POST",

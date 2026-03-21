@@ -95,6 +95,24 @@ export const META_CALL_TO_ACTIONS = [
   { value: "SEE_SHOP", label: "Ver cardápio" },
 ];
 
+/** Eventos de pixel quando o conjunto usa meta de conversão (tráfego ou vendas além de PURCHASE/CART). */
+export const META_PIXEL_CONVERSION_EVENTS = [
+  { value: "PURCHASE", label: "Comprar" },
+  { value: "ADD_TO_CART", label: "Adicionar ao carrinho" },
+  { value: "LEAD", label: "Lead" },
+  { value: "COMPLETE_REGISTRATION", label: "Cadastro completo" },
+  { value: "INITIATE_CHECKOUT", label: "Iniciar checkout" },
+  { value: "VIEW_CONTENT", label: "Visualizar conteúdo" },
+  { value: "PAGE_VIEW", label: "Visualização de página" },
+] as const;
+
+/** Gênero do público (targeting). */
+export const META_GENDER_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: "male", label: "Masculino" },
+  { value: "female", label: "Feminino" },
+] as const;
+
 /** Países aceitos pelo Meta (ISO 3166-1 alpha-2) – lista principal */
 export const META_COUNTRIES: { code: string; name: string }[] = [
   { code: "BR", name: "Brasil" },

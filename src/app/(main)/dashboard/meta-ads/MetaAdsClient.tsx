@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Megaphone,
@@ -26,12 +26,16 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import LoadingOverlay from "@/app/components/ui/LoadingOverlay";
+import MetaCountryPicker from "@/app/components/meta/MetaCountryPicker";
+import MetaSearchablePicker from "@/app/components/meta/MetaSearchablePicker";
+import ShopeeLinkHistoryPickButton from "@/app/components/shopee/ShopeeLinkHistoryPickButton";
 import {
   META_CREATE_CAMPAIGN_OBJECTIVES,
-  META_COUNTRIES,
   META_CALL_TO_ACTIONS,
   META_PUBLISHER_PLATFORMS,
   META_SALES_CONVERSION_EVENTS,
+  META_PIXEL_CONVERSION_EVENTS,
+  META_GENDER_OPTIONS,
   getOptimizationGoalsForObjective,
   getDefaultGoalForObjective,
 } from "@/lib/meta-ads-constants";
@@ -52,7 +56,6 @@ const STEPS = [
 
 // ─── Field helpers ─────────────────────────────────────────────────────────────
 const inputCls = "w-full rounded-xl border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm placeholder-text-secondary/50 focus:outline-none focus:border-shopee-orange transition-colors";
-const selectCls = inputCls;
 
 function Tooltip({ text, wide }: { text: string; wide?: boolean }) {
   const [visible, setVisible] = React.useState(false);
@@ -122,7 +125,9 @@ export default function MetaAdsClient() {
   const [campaignId, setCampaignId] = useState("");
   const [adsetName, setAdsetName] = useState("");
   const [dailyBudget, setDailyBudget] = useState("10");
-  const [countryCode, setCountryCode] = useState("BR");
+  const [countryCodes, setCountryCodes] = useState<string[]>(["BR"]);
+  /** Pixel só para rastreamento no anúncio (tráfego sem meta de conversão no conjunto), via tracking_specs. */
+  const [trafficTrackingPixelId, setTrafficTrackingPixelId] = useState("");
   const [ageMin, setAgeMin] = useState("18");
   const [ageMax, setAgeMax] = useState("65");
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
@@ -259,6 +264,53 @@ export default function MetaAdsClient() {
   const allowedGoalsForObjective = getOptimizationGoalsForObjective(campaignObjective);
   const isCurrentGoalAllowed = allowedGoalsForObjective.some((o) => o.value === optimizationGoal);
 
+  const adAccountPickerOptions = useMemo(
+    () => adAccounts.map((a) => ({ value: a.id, label: a.name, description: a.id.replace(/^act_/, "") })),
+    [adAccounts]
+  );
+  const pagePickerOptions = useMemo(
+    () => (adAccountId ? pageList : pages).map((p) => ({ value: p.id, label: p.name })),
+    [adAccountId, pageList, pages]
+  );
+  const pixelPickerOptions = useMemo(
+    () => pixels.map((p) => ({ value: p.id, label: p.name || "Pixel", description: p.id })),
+    [pixels]
+  );
+  const campaignObjectiveOptions = useMemo(
+    () => META_CREATE_CAMPAIGN_OBJECTIVES.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const genderPickerOptions = useMemo(
+    () => META_GENDER_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const ctaPickerOptions = useMemo(
+    () => META_CALL_TO_ACTIONS.map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
+  const salesConversionPickerOptions = useMemo(
+    () => META_SALES_CONVERSION_EVENTS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const pixelConversionPickerOptions = useMemo(
+    () => META_PIXEL_CONVERSION_EVENTS.map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+  const optimizationGoalPickerOptions = useMemo(
+    () => allowedGoalsForObjective.map((o) => ({ value: o.value, label: o.label })),
+    [allowedGoalsForObjective]
+  );
+
+  const displayOptimizationGoal = isCurrentGoalAllowed ? optimizationGoal : getDefaultGoalForObjective(campaignObjective);
+
+  const handleOptimizationGoalPick = useCallback((v: string) => {
+    setOptimizationGoal(v);
+    if (!["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(v)) {
+      setPixelId("");
+      setConversionEvent("PURCHASE");
+    }
+  }, []);
+
   useEffect(() => {
     if (!canStep3) return;
     if (isSalesCampaign) {
@@ -292,6 +344,7 @@ export default function MetaAdsClient() {
   const createAdSet = async () => {
     const budgetCents = Math.round(parseFloat(dailyBudget || "0") * 100);
     if (budgetCents < 100) { setError("Orçamento diário mínimo: R$ 6,00 (100 centavos)."); return; }
+    if (!countryCodes.length) { setError("Selecione ao menos um país no público."); return; }
     const pubList = META_PUBLISHER_PLATFORMS.map((p) => p.value).filter((p) => publisherPlatforms[p]);
     if (pubList.length === 0) { setError("Selecione ao menos uma plataforma (Facebook, Instagram, etc.)."); return; }
     if (isSalesCampaign && (!pixelId.trim() || !["PURCHASE", "ADD_TO_CART"].includes(conversionEvent))) {
@@ -304,7 +357,9 @@ export default function MetaAdsClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ad_account_id: adAccountId, campaign_id: campaignId, name: adsetName,
-          daily_budget: budgetCents, country_code: countryCode,
+          daily_budget: budgetCents,
+          country_codes: countryCodes.length ? countryCodes : ["BR"],
+          country_code: (countryCodes.length ? countryCodes : ["BR"])[0],
           age_min: parseInt(ageMin, 10) || 18, age_max: parseInt(ageMax, 10) || 65,
           gender,
           optimization_goal: isSalesCampaign ? "OFFSITE_CONVERSIONS" : optimizationGoal,
@@ -345,6 +400,11 @@ export default function MetaAdsClient() {
         if (imageHash.trim()) body.image_hash = imageHash.trim();
         else body.image_url = imageUrl.trim();
       }
+      const convGoals = ["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"];
+      const trackingPix =
+        trafficTrackingPixelId.trim() ||
+        (!isSalesCampaign && convGoals.includes(optimizationGoal) && pixelId.trim() ? pixelId.trim() : "");
+      if (trackingPix) body.tracking_pixel_id = trackingPix;
       const res = await fetch("/api/meta/ads", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
@@ -523,10 +583,15 @@ export default function MetaAdsClient() {
             <>
               <div>
                 <FieldLabel hint="A conta onde a campanha será criada. Precisa da permissão pages_manage_ads.">Conta de anúncios</FieldLabel>
-                <select value={adAccountId} onChange={(e) => setAdAccountId(e.target.value)} className={selectCls}>
-                  <option value="">Selecione uma conta</option>
-                  {adAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <MetaSearchablePicker
+                  value={adAccountId}
+                  onChange={setAdAccountId}
+                  options={adAccountPickerOptions}
+                  modalTitle="Conta de anúncios"
+                  modalDescription="Busque pelo nome da conta. É preciso ter pages_manage_ads no token."
+                  searchPlaceholder="Filtrar contas…"
+                  emptyButtonLabel="Buscar e selecionar conta"
+                />
               </div>
               <div>
                 <FieldLabel hint="Página do Facebook que aparecerá como autor do anúncio.">Página do Facebook</FieldLabel>
@@ -536,11 +601,17 @@ export default function MetaAdsClient() {
                   </div>
                 ) : (
                   <>
-                    <select value={pageId} onChange={(e) => setPageId(e.target.value)} className={selectCls}
-                      disabled={adAccountId && !isPortfolioAccount ? promotePages.length === 0 : false}>
-                      <option value="">Selecione uma página</option>
-                      {(adAccountId ? pageList : pages).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <MetaSearchablePicker
+                      value={pageId}
+                      onChange={setPageId}
+                      options={pagePickerOptions}
+                      modalTitle="Página do Facebook"
+                      modalDescription="Página que aparecerá como autor do anúncio."
+                      searchPlaceholder="Filtrar páginas…"
+                      emptyButtonLabel="Buscar e selecionar página"
+                      disabled={Boolean(adAccountId && !isPortfolioAccount && promotePages.length === 0)}
+                      emptyOptionsMessage="Nenhuma página disponível para esta conta."
+                    />
                     {adAccountId && !isPortfolioAccount && !loadingPromotePages && promotePages.length === 0 && (
                       <p className="text-xs text-amber-400 mt-1.5">Nenhuma Página disponível. Vincule uma Página ao negócio no Facebook.</p>
                     )}
@@ -569,9 +640,14 @@ export default function MetaAdsClient() {
           </div>
           <div>
             <FieldLabel hint="Determina como o Meta otimiza a entrega dos seus anúncios.">Objetivo da campanha</FieldLabel>
-            <select value={campaignObjective} onChange={(e) => setCampaignObjective(e.target.value)} className={selectCls}>
-              {META_CREATE_CAMPAIGN_OBJECTIVES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <MetaSearchablePicker
+              value={campaignObjective}
+              onChange={setCampaignObjective}
+              options={campaignObjectiveOptions}
+              modalTitle="Objetivo da campanha"
+              searchPlaceholder="Filtrar objetivos…"
+              emptyButtonLabel="Escolher objetivo"
+            />
           </div>
           <div>
             <FieldLabel>Nome da campanha</FieldLabel>
@@ -627,41 +703,69 @@ export default function MetaAdsClient() {
                 </p>
                 <div>
                   <FieldLabel hint="Obrigatório para campanhas de vendas.">Pixel</FieldLabel>
-                  <select value={pixelId} onChange={(e) => setPixelId(e.target.value)} className={selectCls}>
-                    <option value="">Selecione o pixel</option>
-                    {pixels.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
-                  </select>
+                  <MetaSearchablePicker
+                    value={pixelId}
+                    onChange={setPixelId}
+                    options={pixelPickerOptions}
+                    modalTitle="Pixel"
+                    modalDescription="Conjunto de dados (pixel) para otimizar vendas no site."
+                    searchPlaceholder="Filtrar por nome ou ID…"
+                    emptyButtonLabel="Buscar e selecionar pixel"
+                    emptyOptionsMessage="Nenhum pixel nesta conta."
+                  />
                 </div>
                 <div>
                   <FieldLabel>Evento para otimizar</FieldLabel>
-                  <select value={conversionEvent} onChange={(e) => setConversionEvent(e.target.value)} className={selectCls}>
-                    {META_SALES_CONVERSION_EVENTS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+                  <MetaSearchablePicker
+                    value={conversionEvent}
+                    onChange={setConversionEvent}
+                    options={salesConversionPickerOptions}
+                    modalTitle="Evento para otimizar"
+                    searchPlaceholder="Filtrar eventos…"
+                    emptyButtonLabel="Escolher evento"
+                  />
                 </div>
               </div>
             ) : (
               <div className="flex-1 space-y-4">
                 <div>
                   <FieldLabel hint="Opções compatíveis com campanhas de tráfego.">Meta de desempenho</FieldLabel>
-                  <select
-                    value={isCurrentGoalAllowed ? optimizationGoal : getDefaultGoalForObjective(campaignObjective)}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setOptimizationGoal(v);
-                      if (!["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(v)) {
-                        setPixelId("");
-                        setConversionEvent("PURCHASE");
-                      }
-                    }}
-                    className={selectCls}
-                  >
-                    {allowedGoalsForObjective.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+                  <MetaSearchablePicker
+                    value={displayOptimizationGoal}
+                    onChange={handleOptimizationGoalPick}
+                    options={optimizationGoalPickerOptions}
+                    modalTitle="Meta de desempenho"
+                    modalDescription="Como o Meta otimiza a entrega neste conjunto."
+                    searchPlaceholder="Filtrar metas…"
+                    emptyButtonLabel="Escolher meta de desempenho"
+                  />
                 </div>
+                {!["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(optimizationGoal) && (
+                  <div className="rounded-xl border border-dark-border/60 bg-dark-bg/40 p-4 space-y-3">
+                    <div className="flex items-center gap-2 border-l-2 border-emerald-500/50 pl-2">
+                      <Link2 className="h-3.5 w-3.5 text-emerald-400/90" />
+                      <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">Rastreamento — eventos do site</h3>
+                    </div>
+                    
+                    <div>
+                      <FieldLabel hint="Opcional. Deixe em branco se não quiser rastrear com pixel neste fluxo.">Pixel</FieldLabel>
+                      <MetaSearchablePicker
+                        value={trafficTrackingPixelId}
+                        onChange={setTrafficTrackingPixelId}
+                        options={pixelPickerOptions}
+                        modalTitle="Pixel — rastreamento no anúncio"
+                        modalDescription="Opcional. Eventos do site via tracking_specs, sem mudar a meta do conjunto."
+                        searchPlaceholder="Filtrar pixels…"
+                        emptyButtonLabel="Escolher pixel (opcional)"
+                        emptyAsTag
+                        emptyTagLabel="Nenhum"
+                        allowClear
+                        clearLabel="Sem pixel de rastreamento"
+                        emptyOptionsMessage="Nenhum pixel nesta conta."
+                      />
+                    </div>
+                  </div>
+                )}
                 {["OFFSITE_CONVERSIONS", "VALUE", "CONVERSIONS"].includes(optimizationGoal) && (
                   <div className="rounded-xl border border-dark-border/60 bg-dark-bg/40 p-4 space-y-4">
                     <div className="flex items-center gap-2 border-l-2 border-shopee-orange/60 pl-2">
@@ -670,25 +774,33 @@ export default function MetaAdsClient() {
                     </div>
                     <div>
                       <FieldLabel hint="Opcional para tráfego com meta de conversão.">Conjunto de dados (Pixel)</FieldLabel>
-                      <select value={pixelId} onChange={(e) => setPixelId(e.target.value)} className={selectCls}>
-                        <option value="">Nenhum</option>
-                        {pixels.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
-                      </select>
+                      <MetaSearchablePicker
+                        value={pixelId}
+                        onChange={setPixelId}
+                        options={pixelPickerOptions}
+                        modalTitle="Conjunto de dados (Pixel)"
+                        searchPlaceholder="Filtrar pixels…"
+                        emptyButtonLabel="Buscar e selecionar pixel"
+                        emptyAsTag
+                        emptyTagLabel="Nenhum"
+                        allowClear
+                        clearLabel="Nenhum"
+                        emptyOptionsMessage="Nenhum pixel nesta conta."
+                      />
                     </div>
-                    {pixelId && (
+                    {pixelId ? (
                       <div>
                         <FieldLabel>Evento de conversão</FieldLabel>
-                        <select value={conversionEvent} onChange={(e) => setConversionEvent(e.target.value)} className={selectCls}>
-                          <option value="PURCHASE">Comprar</option>
-                          <option value="ADD_TO_CART">Adicionar ao carrinho</option>
-                          <option value="LEAD">Lead</option>
-                          <option value="COMPLETE_REGISTRATION">Cadastro completo</option>
-                          <option value="INITIATE_CHECKOUT">Iniciar checkout</option>
-                          <option value="VIEW_CONTENT">Visualizar conteúdo</option>
-                          <option value="PAGE_VIEW">Visualização de página</option>
-                        </select>
+                        <MetaSearchablePicker
+                          value={conversionEvent}
+                          onChange={setConversionEvent}
+                          options={pixelConversionPickerOptions}
+                          modalTitle="Evento de conversão"
+                          searchPlaceholder="Filtrar eventos…"
+                          emptyButtonLabel="Escolher evento"
+                        />
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -754,19 +866,23 @@ export default function MetaAdsClient() {
               </div>
 
               <div>
-                <FieldLabel>País</FieldLabel>
-                <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className={selectCls}>
-                  {META_COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}
-                </select>
+                <FieldLabel hint="Vários países no mesmo conjunto, como no Gerenciador de Anúncios. Pesquise no modal e confirme; os países aparecem como tags laranja.">
+                  Países (público)
+                </FieldLabel>
+               
+                <MetaCountryPicker value={countryCodes} onChange={setCountryCodes} max={25} />
               </div>
 
               <div>
                 <FieldLabel>Gênero</FieldLabel>
-                <select value={gender} onChange={(e) => setGender(e.target.value as "all" | "male" | "female")} className={selectCls}>
-                  <option value="all">Todos</option>
-                  <option value="male">Masculino</option>
-                  <option value="female">Feminino</option>
-                </select>
+                <MetaSearchablePicker
+                  value={gender}
+                  onChange={(v) => setGender(v as "all" | "male" | "female")}
+                  options={genderPickerOptions}
+                  modalTitle="Gênero do público"
+                  searchPlaceholder="Filtrar…"
+                  emptyButtonLabel="Escolher gênero"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -818,11 +934,19 @@ export default function MetaAdsClient() {
               </div>
 
               <div className="shrink-0">
-                <FieldLabel hint="Opcional — pode gerar depois no ATI com o ad_id.">
+                <FieldLabel hint="Opcional — pode gerar depois no ATI com o ad_id. Use a lupa para escolher um link já gerado no Gerador Shopee (com sub-IDs).">
                   <span className="flex items-center gap-1"><Link2 className="h-3 w-3" /> Link de destino</span>
                 </FieldLabel>
-                <input type="url" value={adLink} onChange={(e) => setAdLink(e.target.value)}
-                  placeholder="Deixe em branco ou cole o link da Shopee" className={inputCls} />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="url"
+                    value={adLink}
+                    onChange={(e) => setAdLink(e.target.value)}
+                    placeholder="Deixe em branco ou cole o link da Shopee"
+                    className={`${inputCls} flex-1 min-w-0`}
+                  />
+                  <ShopeeLinkHistoryPickButton onPick={setAdLink} />
+                </div>
               </div>
 
               <div className="flex-1">
@@ -844,9 +968,15 @@ export default function MetaAdsClient() {
                 </div>
                 <div>
                   <FieldLabel hint="Botão de ação exibido no anúncio.">Chamada para ação</FieldLabel>
-                  <select value={callToAction} onChange={(e) => setCallToAction(e.target.value)} className={selectCls}>
-                    {META_CALL_TO_ACTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
+                  <MetaSearchablePicker
+                    value={callToAction}
+                    onChange={setCallToAction}
+                    options={ctaPickerOptions}
+                    modalTitle="Chamada para ação"
+                    modalDescription="Texto do botão no anúncio com link."
+                    searchPlaceholder="Filtrar CTAs…"
+                    emptyButtonLabel="Escolher chamada para ação"
+                  />
                 </div>
               </div>
 

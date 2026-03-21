@@ -44,6 +44,7 @@ import type { MetricLevel } from "@/lib/ati/types";
 import { META_CREATE_CAMPAIGN_OBJECTIVES, META_CAMPAIGN_OBJECTIVES } from "@/lib/meta-ads-constants";
 import MetaAdSetForm from "@/app/components/meta/MetaAdSetForm";
 import MetaAdForm from "@/app/components/meta/MetaAdForm";
+import ShopeeLinkHistoryPickButton from "@/app/components/shopee/ShopeeLinkHistoryPickButton";
 
 function formatBRL(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
@@ -594,6 +595,7 @@ export default function ATIClient() {
     name: string;
     daily_budget: string;
     country_code: string;
+    country_codes: string[];
     age_min: number;
     age_max: number;
     gender: "all" | "male" | "female";
@@ -742,10 +744,14 @@ export default function ATIClient() {
       .then((r) => r.json())
       .then((json) => {
         if (cancelled || json.error) return;
+        const cc = Array.isArray(json.country_codes) && json.country_codes.length > 0
+          ? json.country_codes.map((x: string) => String(x).toUpperCase().slice(0, 2))
+          : [json.country_code ?? "BR"];
         setAdSetEditInitialData({
           name: json.name ?? "",
           daily_budget: json.daily_budget ?? "10",
-          country_code: json.country_code ?? "BR",
+          country_code: cc[0] ?? "BR",
+          country_codes: cc,
           age_min: json.age_min ?? 18,
           age_max: json.age_max ?? 65,
           gender: json.gender ?? "all",
@@ -966,7 +972,8 @@ export default function ATIClient() {
           campaign_id: adSetNewModal.campaignId,
           name: body.name,
           daily_budget: body.daily_budget,
-          country_code: body.country_code,
+          country_codes: body.country_codes,
+          country_code: body.country_codes?.[0] ?? body.country_code,
           age_min: body.age_min,
           age_max: body.age_max,
           gender: body.gender,
@@ -1015,6 +1022,7 @@ export default function ATIClient() {
           image_hash: body.image_hash,
           image_url: body.image_url,
           video_id: body.video_id,
+          ...(body.tracking_pixel_id ? { tracking_pixel_id: body.tracking_pixel_id } : {}),
         }),
       });
       const json = await res.json();
@@ -1041,7 +1049,8 @@ export default function ATIClient() {
           campaign_id: adSetEditModal.campaignId,
           name: body.name,
           daily_budget: body.daily_budget,
-          country_code: body.country_code,
+          country_codes: body.country_codes,
+          country_code: body.country_codes?.[0] ?? body.country_code,
           age_min: body.age_min,
           age_max: body.age_max,
           gender: body.gender,
@@ -1794,7 +1803,16 @@ export default function ATIClient() {
             </p>
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">Link da Shopee</label>
-              <input type="url" value={linkModalShopeeLink} onChange={(e) => setLinkModalShopeeLink(e.target.value)} placeholder="https://s.shopee.com.br/60MfL7egOy" className="w-full rounded-xl border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm placeholder-text-secondary/50 focus:outline-none focus:border-shopee-orange transition-colors" />
+              <div className="flex gap-2 items-center">
+                <input
+                  type="url"
+                  value={linkModalShopeeLink}
+                  onChange={(e) => setLinkModalShopeeLink(e.target.value)}
+                  placeholder="https://s.shopee.com.br/60MfL7egOy"
+                  className="flex-1 min-w-0 rounded-xl border border-dark-border bg-dark-bg py-2 px-3 text-text-primary text-sm placeholder-text-secondary/50 focus:outline-none focus:border-shopee-orange transition-colors"
+                />
+                <ShopeeLinkHistoryPickButton onPick={setLinkModalShopeeLink} />
+              </div>
             </div>
             <p className="text-xs text-text-secondary/70">
               O link é publicado <strong className="text-text-primary">exatamente</strong> como você colou. O cruzamento com vendas é pelo <strong>Sub ID Shopee</strong> que você configurou no anúncio (Sub1 do gerador).
@@ -1981,6 +1999,7 @@ export default function ATIClient() {
               campaignName={adSetEditModal.campaignName}
               defaultName={adSetEditInitialData.name}
               defaultBudget={adSetEditInitialData.daily_budget}
+              defaultCountryCodes={adSetEditInitialData.country_codes}
               defaultCountry={adSetEditInitialData.country_code}
               defaultAgeMin={String(adSetEditInitialData.age_min)}
               defaultAgeMax={String(adSetEditInitialData.age_max)}
