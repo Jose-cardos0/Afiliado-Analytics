@@ -455,7 +455,7 @@ export default function GplCalculatorPage() {
   useEffect(() => {
     let alive = true;
     fetch("/api/evolution/instances").then((r) => r.json()).then((data) => {
-      if (alive && Array.isArray(data.instances)) setEvolutionInstances(data.instances);
+        if (alive && Array.isArray(data.instances)) setEvolutionInstances(data.instances);
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -487,13 +487,13 @@ export default function GplCalculatorPage() {
         const params = new URLSearchParams({ instance_id: instanceId });
         if (start && end) { params.set("start", start); params.set("end", end); }
         fetch(`/api/gpl/group-snapshots?${params.toString()}`, { cache: "no-store" }).then((r) => r.json()).then((data) => {
-          const baseRaw = data.base?.groups;
+            const baseRaw = data.base?.groups;
           const baseNorm = Array.isArray(baseRaw) ? (baseRaw as Array<{ id?: string; nome?: string; qtdMembros?: number }>).map((g) => ({ id: String(g?.id ?? ""), nome: String(g?.nome ?? ""), qtdMembros: Number(g?.qtdMembros ?? 0) })) : [];
-          setBaseGroups(baseNorm.length > 0 ? baseNorm : null);
-          const cum = data.cumulative ?? [];
-          const cumMap: Record<string, { total_novos: number; total_saidas: number }> = {};
+            setBaseGroups(baseNorm.length > 0 ? baseNorm : null);
+            const cum = data.cumulative ?? [];
+            const cumMap: Record<string, { total_novos: number; total_saidas: number }> = {};
           for (const c of cum) { if (c?.group_id) cumMap[c.group_id] = { total_novos: Number(c.total_novos ?? 0), total_saidas: Number(c.total_saidas ?? 0) }; }
-          setGroupCumulative(cumMap);
+            setGroupCumulative(cumMap);
         }).catch(() => {});
       } else {
         setGroupsLastFetchedAt(new Date().toISOString());
@@ -696,10 +696,10 @@ export default function GplCalculatorPage() {
               <span className="ml-2 text-text-secondary/70">· {formatDateBR(startDateApplied)} a {formatDateBR(endDateApplied)}{daysInPeriod > 0 && <span className="text-[#e24c30]/80"> ({daysInPeriod}d)</span>}</span>
             )}
           </p>
-        </div>
+            </div>
         <div className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border ${hasShopeeKeys ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
           {hasShopeeKeys ? <><CheckCircle2 className="h-3 w-3" /> API Shopee</> : <><BarChart3 className="h-3 w-3" /> Relatório local</>}
-        </div>
+          </div>
       </div>
 
       {/* Erro de API */}
@@ -709,7 +709,7 @@ export default function GplCalculatorPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-red-300">Erro ao buscar dados da Shopee</p>
             <p className="text-xs text-red-400/80 mt-0.5">{apiError}</p>
-          </div>
+              </div>
           <div className="flex gap-2 shrink-0">
             <Link href="/configuracoes" className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-medium transition-colors">Configurações</Link>
             <button onClick={() => { setApiError(null); setApiFetchTick((t) => t + 1); }} className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-colors">Tentar novamente</button>
@@ -721,12 +721,12 @@ export default function GplCalculatorPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="p-5 rounded-2xl bg-dark-card border border-dark-border mb-4">
             <Calculator className="h-12 w-12 text-text-secondary/40" />
-          </div>
+              </div>
           <h2 className="text-lg font-semibold text-text-primary mb-2">Nenhum dado disponível</h2>
           <p className="text-sm text-text-secondary max-w-xs mb-6">Faça upload do relatório na seção &quot;Análise de Comissões&quot; ou cadastre suas chaves da Shopee.</p>
           <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 bg-shopee-orange hover:bg-shopee-orange/90 text-white font-semibold rounded-xl text-sm transition-colors">
             Ir para Análise <ArrowRight className="h-4 w-4" />
-          </Link>
+            </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 flex-1 min-h-0">
@@ -735,7 +735,7 @@ export default function GplCalculatorPage() {
           <div className="md:col-span-4 lg:col-span-3 bg-[#27272a] rounded-xl border border-[#2c2c32] p-4 flex flex-col gap-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <div className="flex items-center gap-2 text-emerald-400 bg-emerald-500/10 px-2 py-1.5 rounded border border-emerald-500/20 text-[11px] font-semibold">
               <CheckSquare className="w-3 h-3 shrink-0" /> {hasShopeeKeys ? "API Shopee Conectada" : "Relatório local carregado"}
-            </div>
+                    </div>
 
             <div className="space-y-3 border-b border-dark-border pb-4">
               <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Parâmetros</h3>
@@ -774,9 +774,9 @@ export default function GplCalculatorPage() {
                   className="w-full bg-[#e24c30] text-white text-[11px] py-1.5 rounded font-semibold hover:opacity-90 disabled:opacity-40 transition flex items-center justify-center gap-1.5">
                   {isApiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                   Aplicar Filtro
-                </button>
-              </div>
+                  </button>
             </div>
+          </div>
 
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Valores</h3>
@@ -788,7 +788,7 @@ export default function GplCalculatorPage() {
                 inputClass="text-red-400"
                 tooltip="Soma total do valor investido para atrair os leads no mesmo período." />
             </div>
-          </div>
+                </div>
 
           {/* ── Centro: Resumo + Grupos/Campanhas ── */}
           <div className="md:col-span-8 lg:col-span-6 flex flex-col gap-4 min-h-0">
@@ -803,14 +803,14 @@ export default function GplCalculatorPage() {
                         <Info className="w-3 h-3 text-text-secondary cursor-help" />
                         <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-max max-w-[180px] bg-[#232328] border border-dark-border text-[10px] text-white px-2 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 text-center shadow-lg whitespace-normal leading-tight">
                           {card.tooltip}
-                        </div>
-                      </div>
-                    )}
+                </div>
                   </div>
+                )}
+              </div>
                   <p className={cn("mt-0.5 text-sm font-bold break-words leading-tight", card.tone)}>{card.value}</p>
                 </div>
               ))}
-            </div>
+        </div>
 
             {/* Panel grupos/campanhas */}
             <div className=" rounded-xl  flex-1 relative min-h-[400px] lg:min-h-0">
@@ -823,13 +823,13 @@ export default function GplCalculatorPage() {
                         className={cn("px-4 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2",
                           activeTab === "grupos" ? "bg-[#e24c30] text-white" : "text-text-secondary hover:text-white")}>
                         <Users className="w-3 h-3" /> Grupos
-                      </button>
+                </button>
                       <button type="button" onClick={() => setActiveTab("campanhas")}
                         className={cn("px-4 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2",
                           activeTab === "campanhas" ? "bg-[#e24c30] text-white" : "text-text-secondary hover:text-white")}>
                         <Activity className="w-3 h-3" /> Campanhas
-                      </button>
-                    </div>
+                </button>
+            </div>
                     <div className="hidden lg:flex items-center justify-end gap-2 shrink-0 min-w-0 max-w-full sm:max-w-[min(100%,380px)] ml-auto">
                       <MetaSearchablePicker
                         value={selectedInstanceId}
@@ -852,15 +852,15 @@ export default function GplCalculatorPage() {
                           title="Atualizar campanhas"
                         >
                           <RefreshCcw className="w-3 h-3" />
-                        </button>
+                </button>
                       )}
-                    </div>
+            </div>
                   </div>
                   <div className="flex flex-row items-center gap-2 w-full min-w-0 lg:flex-col lg:items-stretch lg:gap-2">
                     <div className="relative flex-1 min-w-0 lg:w-full">
                       <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-                      <input
-                        type="text"
+                <input
+                  type="text"
                         placeholder={activeTab === "grupos" ? "Buscar grupo…" : "Buscar campanha…"}
                         value={activeTab === "grupos" ? groupSearchFilter : campaignSearchFilter}
                         onChange={(e) => {
@@ -868,8 +868,8 @@ export default function GplCalculatorPage() {
                           else setCampaignSearchFilter(e.target.value);
                         }}
                         className="w-full bg-[#1c1c1f] border border-[#2c2c32] rounded-md py-2 pl-8 pr-3 text-xs focus:border-[#e24c30] outline-none min-w-0"
-                      />
-                    </div>
+                />
+              </div>
                     <div className="flex lg:hidden shrink-0 items-center justify-end gap-2 min-w-0">
                       <MetaSearchablePicker
                         value={selectedInstanceId}
@@ -885,16 +885,16 @@ export default function GplCalculatorPage() {
                         emptyOptionsMessage="Nenhuma instância disponível. Conecte o WhatsApp nas configurações."
                       />
                       {activeTab === "campanhas" && (
-                        <button
-                          type="button"
+              <button
+                type="button"
                           onClick={() => void fetchTraficoGrupos()}
                           className="text-sky-300 hover:text-sky-200 bg-sky-500/10 hover:bg-sky-500/15 border border-sky-500/25 p-1.5 rounded-md transition-colors shrink-0"
                           title="Atualizar campanhas"
                         >
                           <RefreshCcw className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+              </button>
+              )}
+            </div>
                   </div>
                 </div>
 
@@ -911,7 +911,7 @@ export default function GplCalculatorPage() {
                     </p>
                   )}
                   <InlineInfoTooltip text={tabInfoTooltip} iconClassName={activeTab === "grupos" ? "text-emerald-400" : "text-sky-300"} />
-                </div>
+              </div>
 
                 {/* Seleção resumo */}
                 {activeTab === "grupos" && selectedGroupIds.size > 0 && (
@@ -930,20 +930,20 @@ export default function GplCalculatorPage() {
                       <div className="flex items-center gap-2 px-3 py-2 bg-red-500/8 border border-red-500/20 rounded-lg"><AlertCircle className="h-4 w-4 text-red-400 shrink-0" /><p className="text-xs text-red-400">{groupsError}</p></div>
                     ) : !selectedInstanceId ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center"><MessageCircle className="w-8 h-8 text-[#2c2c32] mb-2" /><p className="text-xs text-text-secondary">Selecione uma instância no canto superior direito para carregar os grupos</p></div>
-                    ) : filteredGroups.length === 0 ? (
+            ) : filteredGroups.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center"><p className="text-xs text-text-secondary">{groups.length === 0 ? "Nenhum grupo retornado para esta instância." : "Nenhum grupo encontrado na busca."}</p></div>
-                    ) : (
+            ) : (
                       <>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                         {pagedGroups.map((g) => {
-                          const cum = groupCumulative[g.id];
-                          const delta = groupMemberDelta.get(g.id);
-                          const novosValor = cum ? cum.total_novos : (delta !== undefined && delta.delta > 0 ? delta.delta : 0);
-                          const sairamValor = cum ? cum.total_saidas : (delta !== undefined && delta.delta < 0 ? Math.abs(delta.delta) : 0);
-                          const temComparacao = cum !== undefined || delta !== undefined;
-                          const evasao = sairamValor > 0;
+                  const cum = groupCumulative[g.id];
+                  const delta = groupMemberDelta.get(g.id);
+                  const novosValor = cum ? cum.total_novos : (delta !== undefined && delta.delta > 0 ? delta.delta : 0);
+                  const sairamValor = cum ? cum.total_saidas : (delta !== undefined && delta.delta < 0 ? Math.abs(delta.delta) : 0);
+                  const temComparacao = cum !== undefined || delta !== undefined;
+                  const evasao = sairamValor > 0;
                           const isSelected = selectedGroupIds.has(g.id);
-                          return (
+                  return (
                             <div key={g.id}
                               className={cn("bg-[#1c1c1f] border p-3 rounded-lg flex flex-col hover:border-text-secondary transition cursor-pointer",
                                 evasao ? "border-[#5c3429]" : isSelected ? "border-shopee-orange/40 bg-shopee-orange/5" : "border-dark-border")}
@@ -952,7 +952,7 @@ export default function GplCalculatorPage() {
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <OrangeCheckbox checked={isSelected} onChange={() => toggleGroupSelection(g.id)} />
                                   <span className="text-xs font-bold break-words">{g.nome}</span>
-                                </div>
+                    </div>
                                 <span className="text-[10px] text-sky-400 bg-sky-400/10 px-2 py-0.5 rounded font-medium shrink-0 whitespace-nowrap">{g.qtdMembros} membros</span>
                               </div>
                               {temComparacao && (
@@ -963,23 +963,23 @@ export default function GplCalculatorPage() {
                                 </div>
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
+                  );
+                })}
+              </div>
                       {groupTotalPages > 1 && (
                         <div className="mt-3 pt-2 border-t border-[#2c2c32] flex flex-col items-center justify-center gap-2 text-[10px] text-text-secondary">
                           <div className="flex items-center justify-center gap-2 flex-wrap">
                             <button type="button" onClick={() => setGroupListPage((p) => Math.max(1, p - 1))} disabled={safeGroupPage <= 1} className="px-3 py-1.5 rounded-md border border-[#2c2c32] bg-[#1c1c1f] text-text-secondary hover:text-white disabled:opacity-30 min-w-[76px]">Anterior</button>
                             <span className="text-text-primary/90 font-semibold tabular-nums px-2 shrink-0">Pág. {safeGroupPage}/{groupTotalPages}</span>
                             <button type="button" onClick={() => setGroupListPage((p) => Math.min(groupTotalPages, p + 1))} disabled={safeGroupPage >= groupTotalPages} className="px-3 py-1.5 rounded-md border border-[#2c2c32] bg-[#1c1c1f] text-text-secondary hover:text-white disabled:opacity-30 min-w-[76px]">Próxima</button>
-                          </div>
+          </div>
                           <p className="text-center text-text-secondary/85 leading-relaxed max-w-md">
                             {(safeGroupPage - 1) * LIST_PAGE_SIZE + 1}–{Math.min(safeGroupPage * LIST_PAGE_SIZE, sortedFilteredGroups.length)} de {sortedFilteredGroups.length} grupos
                             <span className="text-text-secondary/60"> · </span>
                             {pagedGroups.reduce((acc, g) => acc + g.qtdMembros, 0).toLocaleString("pt-BR")} membros nesta página
-                          </p>
-                        </div>
-                      )}
+              </p>
+            </div>
+          )}
                       </>
                     )
                   ) : (
@@ -992,18 +992,18 @@ export default function GplCalculatorPage() {
                       <div className="flex flex-col items-center justify-center py-10 text-center">
                         <p className="text-sm text-text-secondary">Nenhuma campanha no cache para este período.</p>
                         <p className="text-xs text-text-secondary/60 mt-1">Use o botão de atualizar (ícone) ao lado da instância, no topo, para buscar na API.</p>
-                      </div>
+            </div>
                     ) : filteredCampaigns.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center">
                         <p className="text-xs text-text-secondary">Nenhuma campanha encontrada na busca.</p>
-                      </div>
+              </div>
                     ) : (
                       <>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                         {pagedCampaigns.map((c) => {
                           const isSelected = selectedTraficoCampaignIds.has(c.id);
                           const isOpen = expandedTraficoCampaigns[c.id];
-                          return (
+                  return (
                             <div
                               key={c.id}
                               role="button"
@@ -1024,22 +1024,22 @@ export default function GplCalculatorPage() {
                                       <span className={cn("text-[10px] px-2 py-0.5 rounded font-medium shrink-0 whitespace-nowrap",
                                         c.status === "ACTIVE" ? "text-emerald-400 bg-emerald-500/10" : "text-sky-400 bg-sky-400/10")}>
                                         {c.status === "ACTIVE" ? "Ativo" : "Pausado"}
-                                      </span>
-                                    </div>
+                          </span>
+                      </div>
                                     <span className="text-[10px] text-sky-400 bg-sky-400/10 px-2 py-0.5 rounded font-medium inline-block mt-1.5 whitespace-nowrap">{formatCurrency(c.spend)} gasto</span>
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    type="button"
+                                <button
+                                  type="button"
                                     onClick={() => toggleTraficoCampaign(c.id)}
                                     className="p-1 rounded-md hover:bg-white/5 text-text-secondary"
                                     aria-expanded={isOpen}
                                   >
                                     {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                  </button>
+                                </button>
                                   <Link href="/dashboard/ati" className="text-[10px] font-semibold text-red-500 hover:text-red-400 transition whitespace-nowrap">Ver no ATI</Link>
-                                </div>
+                                        </div>
                               </div>
                               {isOpen && c.adSets.map((aset) => {
                                 const adSetOpen = expandedTraficoAdSets[aset.id];
@@ -1060,9 +1060,9 @@ export default function GplCalculatorPage() {
                                   </div>
                                 );
                               })}
-                            </div>
-                          );
-                        })}
+                              </div>
+                            );
+                          })}
                       </div>
                       {campaignTotalPages > 1 && (
                         <div className="mt-3 pt-2 border-t border-[#2c2c32] flex flex-col items-center justify-center gap-2 text-[10px] text-text-secondary">
@@ -1078,8 +1078,8 @@ export default function GplCalculatorPage() {
                       )}
                       </>
                     )
-                  )}
-                </div>
+                      )}
+                    </div>
               </div>
             </div>
           </div>
@@ -1106,16 +1106,16 @@ export default function GplCalculatorPage() {
               ) : (
                 <div className="w-full py-2 rounded-lg text-center text-xs text-text-secondary border border-dark-border bg-[#1c1c1f]">
                   {isApiLoading ? "Carregando dados..." : "Aguardando dados..."}
-                </div>
-              )}
+              </div>
+            )}
               {gplPeriod > 0 && (
                 <div className="mt-3 space-y-1.5 text-[10px] text-text-secondary">
                   <div className="flex justify-between"><span>Comissão</span><span className="text-emerald-400 font-semibold">{formatCurrency(totalProfit)}</span></div>
                   <div className="flex justify-between"><span>Membros</span><span className="text-sky-400 font-semibold">{pessoasNoGrupo > 0 ? pessoasNoGrupo.toLocaleString("pt-BR") : "—"}</span></div>
                   <div className="flex justify-between"><span>Período</span><span className="font-semibold">{daysInPeriod}d</span></div>
-                </div>
+          </div>
               )}
-            </div>
+        </div>
           </div>
         </div>
       )}

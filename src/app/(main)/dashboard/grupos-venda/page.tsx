@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  MessageCircle, Loader2, Trash2, Send, AlertCircle, Search,
+  MessageCircle, Loader2, Trash2, AlertCircle, Search,
   Clock, PlusCircle, Info, Zap, Tag, RefreshCw,
   Play, Pause, Hash, Layers, X, ChevronLeft, ChevronRight, ChevronDown,
   List as ListIcon, User, Settings2, Smartphone, CheckCheck,
@@ -255,6 +255,8 @@ export default function GruposVendaPage() {
   const [mobileResumoOpen, setMobileResumoOpen] = useState(false);
   /** Painel: 2 cards/página abaixo de lg; 6 no desktop (lg+, 1024px) */
   const [panelPerPage, setPanelPerPage] = useState(2);
+  /** Painel: filtrar cards por status (evita confusão “Ativos” vs cards Parado) */
+  const [panelStatusFilter, setPanelStatusFilter] = useState<"all" | "active" | "paused">("all");
 
   // ─── API ────────────────────────────────────────────────────────────────────
   const loadInstances = useCallback(async () => {
@@ -340,12 +342,26 @@ export default function GruposVendaPage() {
   const handleDisparar = useCallback(async () => {
     if (!selectedListaId) { setError("Selecione uma lista de grupos."); return; }
     const kwList = keywords.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
-    if (kwList.length === 0) { setError("Digite ao menos uma keyword."); return; }
+    const useListaOfertas = contentMode === "list" && !!selectedListaOfertasId;
+    if (contentMode === "list") {
+      if (!selectedListaOfertasId) {
+        setError("Selecione uma lista de ofertas.");
+        return;
+      }
+    } else if (kwList.length === 0) {
+      setError("Digite ao menos uma keyword.");
+      return;
+    }
     setDisparando(true); setError(null); setFeedback("");
     try {
       const res = await fetch("/api/grupos-venda/disparar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listaId: selectedListaId, keywords: kwList, subId1, subId2, subId3 }),
+        body: JSON.stringify({
+          listaId: selectedListaId,
+          keywords: useListaOfertas ? [] : kwList,
+          listaOfertasId: useListaOfertas ? selectedListaOfertasId : undefined,
+          subId1, subId2, subId3,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Erro ao disparar");
@@ -356,7 +372,7 @@ export default function GruposVendaPage() {
       if (errList.length > 0) setError(errList.map((e: { keyword: string; error: string }) => `${e.keyword}: ${e.error}`).join("; "));
     } catch (e) { setError(e instanceof Error ? e.message : "Erro ao disparar"); }
     finally { setDisparando(false); }
-  }, [selectedListaId, keywords, subId1, subId2, subId3]);
+  }, [selectedListaId, contentMode, selectedListaOfertasId, keywords, subId1, subId2, subId3]);
 
   const handleContinuoToggle = useCallback(async (configId: string, ativar: boolean) => {
     setContinuoTogglingId(configId); setError(null);
@@ -382,7 +398,7 @@ export default function GruposVendaPage() {
 
   const handleAddContinuo = useCallback(async () => {
     if (!selectedListaId) { setError("Selecione uma lista de grupos."); return; }
-    const useListaOfertas = !!selectedListaOfertasId;
+    const useListaOfertas = contentMode === "list" && !!selectedListaOfertasId;
     const kwList = keywords.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
     if (!useListaOfertas && kwList.length === 0) { setError("Digite ao menos uma keyword ou selecione uma lista de ofertas."); return; }
     setContinuoTogglingId("new"); setError(null);
@@ -401,7 +417,7 @@ export default function GruposVendaPage() {
       await loadContinuo();
     } catch (e) { setError(e instanceof Error ? e.message : "Erro ao adicionar disparo 24h"); }
     finally { setContinuoTogglingId(null); }
-  }, [selectedListaId, selectedListaOfertasId, keywords, subId1, subId2, subId3, horaInicio, horaFim, loadContinuo]);
+  }, [selectedListaId, contentMode, selectedListaOfertasId, keywords, subId1, subId2, subId3, horaInicio, horaFim, loadContinuo]);
 
   const handleRemoveContinuo = useCallback(async (id: string) => {
     try {
@@ -431,10 +447,17 @@ export default function GruposVendaPage() {
   const keywordCount = keywords.split("\n").filter((k) => k.trim()).length;
   const selectedList = listas.find((l) => l.id === selectedListaId);
   const filteredLists = listas.filter((l) => l.nomeLista.toLowerCase().includes(listSearch.toLowerCase()));
-  const filteredDisparos = continuoList.filter((d) =>
-    d.listaNome.toLowerCase().includes(panelSearch.toLowerCase()) ||
-    d.instanceId?.toLowerCase().includes(panelSearch.toLowerCase())
-  );
+  const filteredDisparos = continuoList
+    .filter((d) => {
+      if (panelStatusFilter === "active" && !d.ativo) return false;
+      if (panelStatusFilter === "paused" && d.ativo) return false;
+      return true;
+    })
+    .filter(
+      (d) =>
+        d.listaNome.toLowerCase().includes(panelSearch.toLowerCase()) ||
+        d.instanceId?.toLowerCase().includes(panelSearch.toLowerCase()),
+    );
 
   const panelTotalPages = Math.max(1, Math.ceil(filteredDisparos.length / panelPerPage));
   const safePanelPage = Math.min(panelPage, panelTotalPages);
@@ -445,7 +468,7 @@ export default function GruposVendaPage() {
 
   useEffect(() => {
     setPanelPage(1);
-  }, [panelSearch]);
+  }, [panelSearch, panelStatusFilter]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -497,9 +520,16 @@ export default function GruposVendaPage() {
   function handleBack() { setShowStepInfo(false); if (wizardStep > 1) setWizardStep((s) => s - 1); }
   function handleFinish() {
     if (wizardStep === 4) {
-      if (scheduleMode === "24h") { handleAddContinuo(); }
-      else { handleDisparar(); closeWizard(); }
-    } else { closeWizard(); }
+      /* Janela e 24h: sempre registrar em grupos_venda_continuo para aparecer no painel e rodar no cron.
+         Antes, só “24h” fazia isso; “Janela” chamava disparar (envio único) e não criava linha no painel. */
+      if (scheduleMode === "window" && (!horaInicio?.trim() || !horaFim?.trim())) {
+        setError("Defina o horário de início e fim da janela.");
+        return;
+      }
+      void handleAddContinuo();
+      return;
+    }
+    closeWizard();
   }
 
   const stepMeta: Record<number, { title: string; description: ReactNode }> = {
@@ -576,6 +606,33 @@ export default function GruposVendaPage() {
                   </h2>
                   <span className="text-[9px] font-bold text-[#a0a0a0] bg-[#222228] border border-[#2c2c32] px-2 py-0.5 rounded-md">{continuoList.length} disparos</span>
                   <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-full">{activeCount} ativos</span>
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar por status">
+                    {(
+                      [
+                        { id: "all" as const, label: "Todos" },
+                        { id: "active" as const, label: "Ativos" },
+                        { id: "paused" as const, label: "Parados" },
+                      ] as const
+                    ).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setPanelStatusFilter(id)}
+                        className={cn(
+                          "text-[9px] font-bold px-2.5 py-1 rounded-full border transition",
+                          panelStatusFilter === id
+                            ? id === "active"
+                              ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400"
+                              : id === "paused"
+                                ? "bg-[#2c2c32] border-[#3e3e3e] text-[#d0d0d0]"
+                                : "bg-[#e24c30]/15 border-[#e24c30]/35 text-[#e24c30]"
+                            : "bg-transparent border-[#2c2c32] text-[#a0a0a0] hover:text-white hover:border-[#3e3e3e]",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="relative flex-1 min-w-0">
@@ -950,7 +1007,13 @@ export default function GruposVendaPage() {
                         className={cn("px-3 py-1.5 transition-all", scheduleMode === "window" ? "bg-[#e24c30]/20 text-[#e24c30]" : "bg-transparent text-[#a0a0a0] hover:text-white")}>
                         JANELA
                       </button>
-                      <button onClick={() => setScheduleMode("24h")}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScheduleMode("24h");
+                          setHoraInicio("");
+                          setHoraFim("");
+                        }}
                         className={cn("px-3 py-1.5 border-l border-[#2c2c32] transition-all", scheduleMode === "24h" ? "bg-[#e24c30]/20 text-[#e24c30]" : "bg-transparent text-[#a0a0a0] hover:text-white")}>
                         24H
                       </button>
@@ -1061,15 +1124,15 @@ export default function GruposVendaPage() {
                   Avançar <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               ) : (
-                <button onClick={handleFinish} disabled={continuoTogglingId === "new" || disparando}
+                <button onClick={handleFinish} disabled={continuoTogglingId === "new"}
                   className={cn("w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all shadow-lg group disabled:opacity-40",
                     scheduleMode === "24h"
                       ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 shadow-emerald-500/5"
                       : "bg-[#e24c30]/10 border border-[#e24c30]/25 text-[#e24c30] hover:bg-[#e24c30] hover:text-white shadow-[#e24c30]/5")}>
-                  {continuoTogglingId === "new" || disparando ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  {continuoTogglingId === "new" ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     : scheduleMode === "24h" ? <PlusCircle className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform duration-300" />
-                    : <Send className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />}
-                  {scheduleMode === "24h" ? "Disparo 24h" : "Disparar"}
+                    : <Play className="w-3.5 h-3.5 fill-current" />}
+                  {scheduleMode === "24h" ? "Disparo 24h" : "Ativar automação"}
                 </button>
               )}
             </div>

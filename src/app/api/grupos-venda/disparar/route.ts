@@ -1,7 +1,8 @@
 /**
- * Disparar ofertas: para cada keyword busca 1 produto na Shopee, gera link de afiliado
- * e envia ao webhook n8n (que envia para os grupos WhatsApp via Evolution).
- * POST { instanceId, keywords: string[], subId1?, subId2?, subId3? }
+ * Disparar ofertas: envia ao webhook n8n (Evolution → grupos).
+ * - Modo keywords: para cada keyword busca 1 produto na Shopee e gera link.
+ * - Modo lista: listaOfertasId + keywords vazio — um disparo por item de Minha Lista de Ofertas.
+ * POST { listaId | instanceId, keywords?: string[], listaOfertasId?, subId1?, subId2?, subId3? }
  */
 
 import { NextResponse } from "next/server";
@@ -30,9 +31,15 @@ export async function POST(req: Request) {
     const subId1 = typeof body.subId1 === "string" ? body.subId1.trim() : "";
     const subId2 = typeof body.subId2 === "string" ? body.subId2.trim() : "";
     const subId3 = typeof body.subId3 === "string" ? body.subId3.trim() : "";
+    const listaOfertasId = typeof body.listaOfertasId === "string" ? body.listaOfertasId.trim() : "";
 
     if (!listaId && !instanceId) return NextResponse.json({ error: "Informe listaId ou instanceId." }, { status: 400 });
-    if (keywords.length === 0) return NextResponse.json({ error: "Informe ao menos uma keyword." }, { status: 400 });
+    if (!listaOfertasId && keywords.length === 0) {
+      return NextResponse.json(
+        { error: "Informe ao menos uma keyword ou uma lista de ofertas (listaOfertasId)." },
+        { status: 400 },
+      );
+    }
 
     let instance: { id: string; nome_instancia: string; hash: string | null } | null = null;
     let groupIds: string[] = [];
@@ -67,8 +74,6 @@ export async function POST(req: Request) {
     const cookie = req.headers.get("cookie") ?? "";
 
     const subIds = [subId1, subId2, subId3].filter(Boolean);
-    const instanceName = instance.nome_instancia;
-    const hash = instance.hash ?? "";
 
     const sent: { keyword: string; productName: string; link: string }[] = [];
     const errors: { keyword: string; error: string }[] = [];
