@@ -64,7 +64,7 @@ function formatPct(value: number): string {
 /** Afiliado Shopee: valor da venda ≠ comissão. ROAS e lucro líquido usam comissão. */
 const ATI_HINT = {
   custo:
-    "Afiliado Shopee: quanto você gastou em anúncio no Meta (Facebook) neste anúncio — lifetime. Não tem relação com o valor do produto na Shopee.",
+    "Quanto você gastou em anúncio no Meta (Facebook) neste anúncio, no mesmo período selecionado acima (Meta + vendas Shopee). Não tem relação com o valor do produto na Shopee.",
   valorVendas:
     "Soma do que os clientes pagaram nos pedidos (Valor de Compra no relatório Shopee), com seu Sub ID no período. Ex.: produto sai R$ 50 — aqui entra R$ 50. Isso NÃO é o que cai na sua conta; sua grana é a comissão.",
   comissao:
@@ -1331,8 +1331,8 @@ export default function ATIClient() {
     setCampaignListPage((p) => (p > max ? max : p < 1 ? 1 : p));
   }, [filteredAndGrouped.length]);
 
-  const shopeePeriodLabel = `${new Date(start).toLocaleDateString("pt-BR")} – ${new Date(end).toLocaleDateString("pt-BR")}`;
-  const dateLabel = `Vendas Shopee: ${shopeePeriodLabel}`;
+  const periodLabel = `${new Date(start).toLocaleDateString("pt-BR")} – ${new Date(end).toLocaleDateString("pt-BR")}`;
+  const dateLabel = `Meta + Shopee: ${periodLabel}`;
 
   return (
     <>
@@ -1351,10 +1351,10 @@ export default function ATIClient() {
             </div>
           </div>
 
-          {/* Período (vendas Shopee no relatório) + um único botão que atualiza Meta + Shopee */}
+          {/* Período: métricas Meta (insights) + vendas Shopee no relatório */}
           <div className="flex flex-col items-end gap-1 shrink-0 max-w-full">
             <span className="text-[10px] text-text-secondary/80 font-medium uppercase tracking-wide text-right">
-              Período das vendas Shopee
+              Período Meta + Shopee
             </span>
             <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-1.5 bg-dark-card border border-dark-border rounded-xl px-3 py-1.5">
