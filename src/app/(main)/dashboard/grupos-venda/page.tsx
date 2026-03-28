@@ -243,7 +243,7 @@ export default function GruposVendaPage() {
   const [continuoTogglingId, setContinuoTogglingId] = useState<string | null>(null);
   const [deletingListaId, setDeletingListaId] = useState<string | null>(null);
   const [cronTestLoading, setCronTestLoading] = useState(false);
-  const [cronTestResult, setCronTestResult] = useState<string | null>(null);
+  const [cronTestFeedback, setCronTestFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [listasOfertas, setListasOfertas] = useState<ListaOfertasItem[]>([]);
   const [loadingListasOfertas, setLoadingListasOfertas] = useState(false);
   const [selectedListaOfertasId, setSelectedListaOfertasId] = useState("");
@@ -450,7 +450,9 @@ export default function GruposVendaPage() {
   }, [loadContinuo]);
 
   const handleTestCron = useCallback(async () => {
-    setCronTestLoading(true); setCronTestResult(null); setError(null);
+    setCronTestLoading(true);
+    setCronTestFeedback(null);
+    setError(null);
     try {
       const supabase = createBrowserSupabase();
       const { data: { session } } = await supabase.auth.getSession();
@@ -463,26 +465,50 @@ export default function GruposVendaPage() {
         headers,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setCronTestResult(`Erro ${res.status}: ${data?.error ?? res.statusText}`); return; }
-      const processed = data.processed ?? 0;
-      const results = data.results ?? [];
+
       type CronRow = { keyword?: string; ok?: boolean; error?: string };
-      const enviados = results.filter((r: CronRow) => r.ok && !r.error).length;
-      const ignorados = results.filter((r: CronRow) => r.ok && !!r.error).length;
-      const falhas = results.filter((r: CronRow) => !r.ok).length;
-      const partesResumo = [`Processados: ${processed}`, `enviados: ${enviados}`];
-      if (ignorados > 0) partesResumo.push(`ignorados: ${ignorados}`);
-      if (falhas > 0) partesResumo.push(`falhas: ${falhas}`);
-      const linhas = (results as CronRow[]).map((r) => {
+      const results = (data.results ?? []) as CronRow[];
+      const processed = typeof data.processed === "number" ? data.processed : 0;
+      const enviados = results.filter((r) => r.ok && !r.error).length;
+      const ignorados = results.filter((r) => r.ok && !!r.error).length;
+      const falhas = results.filter((r) => !r.ok).length;
+      const linhas = results.map((r) => {
         if (!r.ok) return `"${r.keyword ?? "—"}": ${r.error ?? "erro"}`;
         if (r.error) return r.error;
         const rotulo = r.keyword?.trim() || "Oferta";
         return `"${rotulo}" enviado`;
       });
-      setCronTestResult(`${partesResumo.join(" · ")}. ${results.length ? linhas.join("; ") : "Nenhum disparo ativo."}`);
+
+      if (!res.ok) {
+        console.error("[grupos-venda cron teste manual]", {
+          httpStatus: res.status,
+          body: data,
+          derived: { processed, enviados, ignorados, falhas },
+          detailLines: linhas,
+        });
+        setCronTestFeedback({ ok: false, message: "Erro. Entre em contato com o suporte." });
+        return;
+      }
+
+      console.log("[grupos-venda cron teste manual]", {
+        httpStatus: res.status,
+        body: data,
+        derived: { processed, enviados, ignorados, falhas },
+        detailLines: linhas.length ? linhas : [(data as { message?: string }).message ?? "—"],
+      });
+
+      if (falhas > 0) {
+        setCronTestFeedback({ ok: false, message: "Erro. Entre em contato com o suporte." });
+      } else {
+        setCronTestFeedback({ ok: true, message: "Enviado." });
+      }
       if (processed > 0) loadContinuo();
-    } catch (e) { setCronTestResult(`Falha: ${e instanceof Error ? e.message : "Erro ao chamar cron"}`); }
-    finally { setCronTestLoading(false); }
+    } catch (e) {
+      console.error("[grupos-venda cron teste manual]", e);
+      setCronTestFeedback({ ok: false, message: "Erro. Entre em contato com o suporte." });
+    } finally {
+      setCronTestLoading(false);
+    }
   }, [loadContinuo]);
 
   const activeCount = continuoList.filter((c) => c.ativo).length;
@@ -715,9 +741,16 @@ export default function GruposVendaPage() {
               </div>
             </div>
 
-            {cronTestResult && (
-              <div className="mx-4 mt-3 p-3 rounded-xl bg-dark-bg border border-dark-border text-xs text-text-primary leading-relaxed">
-                {cronTestResult}
+            {cronTestFeedback && (
+              <div
+                className={cn(
+                  "mx-4 mt-3 p-3 rounded-xl border text-xs font-semibold leading-relaxed",
+                  cronTestFeedback.ok
+                    ? "bg-emerald-500/8 border-emerald-500/35 text-emerald-300"
+                    : "bg-red-500/8 border-red-500/35 text-red-300",
+                )}
+              >
+                {cronTestFeedback.message}
               </div>
             )}
 
