@@ -112,6 +112,19 @@ Até existir o workflow real no n8n, use como placeholder:
 
 ---
 
+## Para funcionar e testar com o n8n: o webhook é o elo
+
+Para **ligar a Evolution ao n8n** e **começar a testar o fluxo** (receber evento de mensagem, validar, encaminhar), o que o time precisa fechar em primeiro lugar é o **webhook**:
+
+1. **Entrada (Evolution → n8n):** URL do **Webhook** (ou **Workflow**) no n8n que a Evolution chama em cada mensagem (global ou por instância — conforme a config de vocês). Sem essa URL estável, não há evento chegando no n8n.
+2. **Saída (n8n → disparo WhatsApp):** pode ser o **mesmo padrão do Grupos de Venda** — um segundo webhook n8n que já recebe `instanceName`, `hash`, `groupIds`, `descricao`, etc., e fala com a Evolution. Para espelhamento, costuma ser **outra URL** (novo workflow ou branch), mas continua sendo **só webhook + JSON** acordado.
+
+Ou seja: **para testar com o n8n, você não “precisa” de tudo do app pronto de uma vez** — precisa sobretudo das **URLs de webhook** definidas, públicas (ou acessíveis pela Evolution), e do **formato do payload** que o workflow espera. O app (Vercel) entra com **endpoints** que o n8n chama (ex.: validar config no Supabase, trocar link Shopee), mas o **primeiro passo operacional** costuma ser: **webhook de entrada na Evolution + workflow no n8n**.
+
+O placeholder **`https://falsewebhook.espelhamento.n8n.codenxt`** serve só até existir a URL real do seu n8n; em produção/teste real, substitui pela URL gerada pelo n8n (ex.: `https://n8n.seudominio/webhook/...`).
+
+---
+
 ## Limites de plano (números do código — `src/lib/plan-entitlements.ts`)
 
 Estes são os limites **atuais** de **Grupos de Venda**; a feature Espelhamento deve **alinhar** a ela para não permitir “10 + 10” automações implícitas.
@@ -158,7 +171,7 @@ Implementar a feature **Espelhamento de Grupos**:
 1. UI: nova aba na sidebar do dashboard, rota `/dashboard/espelhamento-grupos`.
 2. O usuário com instância conectada escolhe grupo **fonte** (monitorar) e grupo **destino** (republicar), ambos da mesma lógica de grupos que já usamos (`buscar_grupo`).
 3. Persistir config em Supabase (novas tabelas, ex.: `configuracoes_espelhamento`, `payloads_recebidos` — com RLS por `user_id`).
-4. Pipeline externo: Evolution → webhook → n8n valida instância+grupo origem no Supabase; se ok, insere payload pendente; chama endpoint do app para **substituir links Shopee** no texto pelo link afiliado do usuário (reutilizar lógica de `/api/shopee/generate-link`); envia ao destino via mesmo padrão de webhook que Grupos de Venda (novo URL ou variável de ambiente). Placeholder até o n8n existir: `https://falsewebhook.espelhamento.n8n.codenxt`.
+4. Pipeline externo: Evolution → **webhook** n8n (prioridade para teste: ter a URL de entrada na Evolution + workflow); n8n valida instância+grupo origem no Supabase; se ok, insere payload pendente; chama endpoint do app para **substituir links Shopee** no texto pelo link afiliado do usuário (reutilizar lógica de `/api/shopee/generate-link`); envia ao destino via webhook de disparo (mesmo padrão que Grupos de Venda — novo URL ou env). Placeholder até o n8n existir: `https://falsewebhook.espelhamento.n8n.codenxt`.
 5. **Limites:** espelhamento deve respeitar os mesmos tetos que Grupos de Venda (`maxActiveCampaigns`, `maxGroupsTotal`, etc.): não permitir destino que já tem automação/campanha conflitante de forma a ultrapassar o plano; documentar a regra na UI.
 
 ## Restrições

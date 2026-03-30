@@ -14,6 +14,7 @@ import {
   Megaphone,
   ShoppingBag,
   MessageCircle,
+  ArrowLeftRight,
   ListChecks,
   Film,
   Lock,
@@ -88,6 +89,11 @@ const sidebarNavItems: NavItem[] = [
     title: "Grupos de Venda",
     href: "/dashboard/grupos-venda",
     icon: <MessageCircle className="h-5 w-5" />,
+  },
+  {
+    title: "Espelhamento de grupos",
+    href: "/dashboard/espelhamento-grupos",
+    icon: <ArrowLeftRight className="h-5 w-5" />,
   },
   {
     title: "Minha Lista de Ofertas",
