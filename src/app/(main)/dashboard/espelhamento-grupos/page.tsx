@@ -22,6 +22,7 @@ import {
   Info,
   ShieldCheck,
 } from "lucide-react";
+import { GeradorPaginationBar } from "@/app/components/shopee/GeradorPaginationBar";
 import BuscarGruposModal, {
   type BuscarGruposPayload,
   type EvolutionInstanceItem,
@@ -124,7 +125,7 @@ function EspelhamentoCard({
           <Download className="w-2.5 h-2.5 text-emerald-400 shrink-0 mt-0.5" />
           <span className="line-clamp-2 break-words">
             <span className="text-emerald-400/90 font-semibold">Origem · </span>
-            {group.grupoOrigemNome ?? group.grupoOrigemJid}
+            {group.grupoOrigemNome ?? "Grupo origem"}
           </span>
         </div>
         <div className="flex items-start gap-1.5 min-w-0">
@@ -195,6 +196,8 @@ export default function EspelhamentoGruposPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTarget, setModalTarget] = useState<"origem" | "destino">("origem");
   const [detailsGroupKey, setDetailsGroupKey] = useState<string | null>(null);
+  const [cardsPageIndex, setCardsPageIndex] = useState(0);
+  const [itemsPerCardsPage, setItemsPerCardsPage] = useState(2);
 
   const activeCount = useMemo(() => configs.filter((c) => c.ativo).length, [configs]);
   const configById = useMemo(() => new Map(configs.map((c) => [c.id, c])), [configs]);
@@ -236,6 +239,24 @@ export default function EspelhamentoGruposPage() {
     () => groupedConfigs.find((g) => g.key === detailsGroupKey) ?? null,
     [groupedConfigs, detailsGroupKey]
   );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setItemsPerCardsPage(mq.matches ? 4 : 2);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const totalCardsPages = Math.max(1, Math.ceil(groupedConfigs.length / itemsPerCardsPage));
+  const paginatedGroupedConfigs = useMemo(() => {
+    const start = cardsPageIndex * itemsPerCardsPage;
+    return groupedConfigs.slice(start, start + itemsPerCardsPage);
+  }, [groupedConfigs, cardsPageIndex, itemsPerCardsPage]);
+
+  useEffect(() => {
+    setCardsPageIndex((p: number) => Math.min(p, Math.max(0, totalCardsPages - 1)));
+  }, [groupedConfigs.length, itemsPerCardsPage, totalCardsPages]);
   const sharedGroupsUsed = useMemo(() => {
     const set = new Set<string>();
     for (const gid of gruposVendaIds) {
@@ -500,7 +521,7 @@ export default function EspelhamentoGruposPage() {
           </div>
           Espelhamento de grupos
         </h1>
-        <p className="text-[11px] text-[#a0a0a0] mt-1 leading-relaxed max-w-2xl">
+        <p className="text-[11px] text-[#a0a0a0] mt-1 leading-relaxed max-w-2xl hidden">
           Copie ofertas do grupo <span className="text-white font-semibold">origem</span> para o{" "}
           <span className="text-white font-semibold">destino</span> trocando links Shopee pelos seus (afiliado). O n8n
           envia mensagens para{" "}
@@ -567,8 +588,7 @@ export default function EspelhamentoGruposPage() {
             <div>
               <h2 className="text-sm font-bold text-white leading-snug">Configurar espelhamento</h2>
               <p className="text-[11px] text-[#a0a0a0] leading-relaxed mt-1">
-                Escolha a instância WhatsApp, os grupos origem/destino e opcionalmente Sub IDs (Shopee). Salvar cria a
-                regra <span className="text-[#a0a0a0]">parada</span>; ative depois no painel.
+                Escolha a instância WhatsApp, os grupos origem/destino e opcionalmente Sub IDs (Shopee). Após salvar, ative o espelhamento no painel.
               </p>
             </div>
             <button
@@ -588,7 +608,7 @@ export default function EspelhamentoGruposPage() {
                   <Info className="w-3 h-3 text-[#e24c30]" /> Sobre o fluxo
                 </p>
                 <p className="text-[10px] text-[#a0a0a0] leading-relaxed">
-                  O n8n recebe o webhook da Evolution e chama o pipeline do app. Só mensagens com link Shopee no texto são
+                   Só mensagens com link Shopee no texto são
                   convertidas. Respeita o limite de automações do plano e não usa destino já ocupado pelo disparo contínuo
                   de Grupos de Venda.
                 </p>
@@ -691,8 +711,7 @@ export default function EspelhamentoGruposPage() {
                     {origem && (
                       <p className="text-[#a0a0a0]">
                         <span className="text-emerald-400 font-bold">Origem · </span>
-                        {origem.nome}{" "}
-                        <span className="font-mono text-[9px] opacity-70 break-all">({origem.jid})</span>
+                        {origem.nome}
                       </p>
                     )}
                     {destinos.length > 0 && (
@@ -701,7 +720,7 @@ export default function EspelhamentoGruposPage() {
                         <div className="max-h-24 overflow-y-auto scrollbar-thin space-y-1 pr-1">
                           {destinos.map((d) => (
                             <p key={d.jid} className="text-[#a0a0a0]">
-                              {d.nome} <span className="font-mono text-[9px] opacity-70 break-all">({d.jid})</span>
+                              {d.nome}
                             </p>
                           ))}
                         </div>
@@ -718,7 +737,7 @@ export default function EspelhamentoGruposPage() {
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e24c30] px-5 py-2.5 text-[11px] font-bold text-white hover:opacity-90 disabled:opacity-40 shadow-lg shadow-[#e24c30]/20 transition"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
-                    Salvar configuração (inativa)
+                    Adicionar Espelhamento
                   </button>
                   <button
                     type="button"
@@ -742,7 +761,7 @@ export default function EspelhamentoGruposPage() {
                 <Settings2 className="w-3.5 h-3.5 text-[#e24c30]" />
                 Painel de espelhamentos
               </h2>
-              <span className="text-[9px] font-bold text-[#a0a0a0] bg-[#222228] border border-[#2c2c32] px-2 py-0.5 rounded-md">
+              <span className="hidden text-[9px] font-bold text-[#a0a0a0] bg-[#222228] border border-[#2c2c32] px-2 py-0.5 rounded-md">
                 {configs.length} regra{configs.length !== 1 ? "s" : ""}
               </span>
               <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-full">
@@ -762,16 +781,14 @@ export default function EspelhamentoGruposPage() {
         </div>
 
         <div className="p-4">
-          <div className="mb-4 rounded-xl border border-[#2c2c32] bg-[#1c1c1f] p-3.5">
+          <div className="mb-4 rounded-xl border border-[#2c2c32] bg-[#1c1c1f] p-3.5 hidden">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#e24c30]" />
                   Saldo compartilhado de grupos
                 </p>
-                <p className="text-[10px] text-[#a0a0a0] mt-1">
-                  Soma de destinos do Espelhamento + grupos do Grupos de Venda.
-                </p>
+              
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-white bg-[#222228] border border-[#2c2c32] px-2 py-1 rounded-md">
@@ -806,22 +823,38 @@ export default function EspelhamentoGruposPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {groupedConfigs.map((group) => (
-                <EspelhamentoCard
-                  key={group.key}
-                  group={group}
-                  pendingIds={pendingActionIds}
-                  onToggleBatch={handleToggleBatch}
-                  onOpenDetails={setDetailsGroupKey}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+                {paginatedGroupedConfigs.map((group) => (
+                  <EspelhamentoCard
+                    key={group.key}
+                    group={group}
+                    pendingIds={pendingActionIds}
+                    onToggleBatch={handleToggleBatch}
+                    onOpenDetails={setDetailsGroupKey}
+                  />
+                ))}
+              </div>
+              {totalCardsPages > 1 && (
+                <nav
+                  className="mt-4 pt-4 pb-1 border-t border-[#2c2c32] lg:mt-3 lg:pt-3 px-2 sm:px-4"
+                  aria-label="Paginação das regras de espelhamento"
+                >
+                  <GeradorPaginationBar
+                    page={cardsPageIndex + 1}
+                    totalPages={totalCardsPages}
+                    summary={`Mostrando ${cardsPageIndex * itemsPerCardsPage + 1}–${Math.min((cardsPageIndex + 1) * itemsPerCardsPage, groupedConfigs.length)} de ${groupedConfigs.length} ${groupedConfigs.length === 1 ? "regra" : "regras"}`}
+                    onPrev={() => setCardsPageIndex((p: number) => Math.max(0, p - 1))}
+                    onNext={() => setCardsPageIndex((p: number) => Math.min(totalCardsPages - 1, p + 1))}
+                  />
+                </nav>
+              )}
+            </>
           )}
         </div>
       </section>
 
-      <section className="bg-[#27272a] border border-[#2c2c32] rounded-xl overflow-hidden">
+      <section className="bg-[#27272a] border border-[#2c2c32] rounded-xl overflow-hidden hidden">
         <div className="px-4 sm:px-5 py-3 border-b border-[#2c2c32] flex items-center gap-2">
           <ScrollText className="w-3.5 h-3.5 text-[#e24c30]" />
           <h2 className="text-[10px] font-bold text-white uppercase tracking-widest">Últimos eventos (pipeline)</h2>
@@ -839,9 +872,7 @@ export default function EspelhamentoGruposPage() {
                     (p.config_id ? configById.get(p.config_id) : undefined) ??
                     configs.find((c) => c.grupoOrigemJid === p.grupo_origem_jid);
                   const origemNome = linkedConfig?.grupoOrigemNome ?? "Grupo origem";
-                  const origemJid = linkedConfig?.grupoOrigemJid ?? p.grupo_origem_jid;
                   const destinoNome = linkedConfig?.grupoDestinoNome ?? "Grupo destino";
-                  const destinoJid = linkedConfig?.grupoDestinoJid ?? "-";
                   return (
                 <li
                   key={p.id}
@@ -863,11 +894,9 @@ export default function EspelhamentoGruposPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                     <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2">
                       <p className="text-[9px] text-emerald-400 font-semibold truncate">{origemNome}</p>
-                      <p className="text-[9px] text-[#868686] font-mono break-all mt-1">{origemJid}</p>
                     </div>
                     <div className="rounded-lg border border-red-500/25 bg-red-500/5 p-2">
                       <p className="text-[9px] text-red-400 font-semibold truncate">{destinoNome}</p>
-                      <p className="text-[9px] text-[#868686] font-mono break-all mt-1">{destinoJid}</p>
                     </div>
                   </div>
                   {p.erro_detalhe && <p className="text-red-300/90 mt-2 text-[9px] break-all">{p.erro_detalhe}</p>}
@@ -896,7 +925,7 @@ export default function EspelhamentoGruposPage() {
                   Destinos do espelhamento
                 </p>
                 <p className="text-[10px] text-[#a0a0a0]">
-                  {detailsGroup.grupoOrigemNome ?? detailsGroup.grupoOrigemJid}
+                  {detailsGroup.grupoOrigemNome ?? "Grupo origem"}
                 </p>
               </div>
               <button
@@ -934,9 +963,8 @@ export default function EspelhamentoGruposPage() {
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="min-w-0">
                         <p className="text-[10px] text-white font-semibold">
-                          {d.grupoDestinoNome ?? d.grupoDestinoJid}
+                          {d.grupoDestinoNome ?? "Grupo destino"}
                         </p>
-                        <p className="text-[9px] text-[#868686] font-mono mt-1 break-all">{d.grupoDestinoJid}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span
