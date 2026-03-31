@@ -10,7 +10,7 @@ import { PriceTag } from "../components/PriceTag";
 import { CTASlide } from "../components/CTASlide";
 import { interleaveMedia } from "../utils";
 
-const EFFECTS = ["zoomIn", "zoomOut", "panLeft", "panRight"] as const;
+const EFFECTS = ["impactPunch", "whiplash", "kenBurnsIn", "zoomIn"] as const;
 
 export const ShowcaseVideo: React.FC<VideoInputProps> = (props) => {
   const { media: rawMedia, voiceoverSrc, musicSrc, musicVolume, captions, subtitleTheme, price, ctaText, productName, durationInFrames } = props;
@@ -62,7 +62,9 @@ export const ShowcaseVideo: React.FC<VideoInputProps> = (props) => {
           loop
         />
       )}
-      {captions.length > 0 && <AnimatedCaption captions={captions} theme={subtitleTheme} />}
+      {captions.length > 0 && (
+        <AnimatedCaption captions={captions} theme={subtitleTheme} />
+      )}
     </AbsoluteFill>
   );
 };

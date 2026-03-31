@@ -1,21 +1,31 @@
 import React from "react";
-import { AbsoluteFill, Sequence, Audio, interpolate, useCurrentFrame, useVideoConfig, spring } from "remotion";
+import { AbsoluteFill, Sequence, Audio, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import type { VideoInputProps } from "../types";
 import { MediaScene } from "../components/MediaScene";
 import { AnimatedCaption } from "../components/AnimatedCaption";
 import { CTASlide } from "../components/CTASlide";
+import { ColorGradeOverlay } from "../components/ColorGradeOverlay";
 import { interleaveMedia } from "../utils";
 
-export const FastCutsVideo: React.FC<VideoInputProps> = (props) => {
-  const { media: rawMedia, voiceoverSrc, musicSrc, musicVolume, captions, subtitleTheme, ctaText, productName, durationInFrames } = props;
+export const PremiumFastCuts: React.FC<VideoInputProps> = (props) => {
+  const {
+    media: rawMedia,
+    voiceoverSrc,
+    musicSrc,
+    musicVolume,
+    captions,
+    subtitleTheme,
+    ctaText,
+    productName,
+    durationInFrames,
+  } = props;
   const { fps } = useVideoConfig();
-  const frame = useCurrentFrame();
   const media = interleaveMedia(rawMedia);
 
   const ctaDuration = Math.round(fps * 2);
   const contentFrames = durationInFrames - ctaDuration;
   const scenesCount = media.length || 1;
-  const framesPerScene = Math.max(Math.round(fps * 0.48), Math.floor(contentFrames / scenesCount));
+  const framesPerScene = Math.max(Math.round(fps * 0.42), Math.floor(contentFrames / scenesCount));
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -27,8 +37,8 @@ export const FastCutsVideo: React.FC<VideoInputProps> = (props) => {
               asset={asset}
               effect={i % 3 === 0 ? "impactPunch" : i % 3 === 1 ? "whiplash" : "shakeMicro"}
             />
-            {/* Flash branco no cut */}
-            <FlashOverlay />
+            <FlashOverlay strong />
+            <ColorGradeOverlay variant="viralSaturated" grainAmount={0.08} vignetteAmount={0.45} />
           </Sequence>
         );
       })}
@@ -42,7 +52,7 @@ export const FastCutsVideo: React.FC<VideoInputProps> = (props) => {
         <Audio
           src={musicSrc}
           volume={(f) => {
-            const vol = musicVolume ?? 0.2;
+            const vol = musicVolume ?? 0.22;
             return interpolate(f, [durationInFrames - fps, durationInFrames], [vol, 0], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
@@ -52,17 +62,17 @@ export const FastCutsVideo: React.FC<VideoInputProps> = (props) => {
         />
       )}
 
-      {captions.length > 0 && (
-        <AnimatedCaption captions={captions} theme={subtitleTheme} />
-      )}
+      {captions.length > 0 && <AnimatedCaption captions={captions} theme={subtitleTheme} />}
     </AbsoluteFill>
   );
 };
 
-const FlashOverlay: React.FC = () => {
+const FlashOverlay: React.FC<{ strong?: boolean }> = ({ strong }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const opacity = interpolate(frame, [0, Math.round(fps * 0.15)], [0.6, 0], { extrapolateRight: "clamp" });
+  const opacity = interpolate(frame, [0, Math.round(fps * 0.12)], [strong ? 0.75 : 0.55, 0], {
+    extrapolateRight: "clamp",
+  });
 
   return (
     <AbsoluteFill

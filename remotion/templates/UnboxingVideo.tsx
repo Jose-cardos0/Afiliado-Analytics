@@ -80,7 +80,9 @@ export const UnboxingVideo: React.FC<VideoInputProps> = (props) => {
           return Math.min(fadeIn, fadeOut);
         }} loop />
       )}
-      {captions.length > 0 && <AnimatedCaption captions={captions} theme={subtitleTheme} />}
+      {captions.length > 0 && (
+        <AnimatedCaption captions={captions} theme={subtitleTheme} />
+      )}
     </AbsoluteFill>
   );
 };

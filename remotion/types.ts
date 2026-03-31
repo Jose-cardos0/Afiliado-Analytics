@@ -18,7 +18,19 @@ export type VideoStyleId =
   | "reviewRapido"
   | "ugcStyle"
   | "flashSale"
-  | "unboxing";
+  | "unboxing"
+  /** Edições premium (transições cinematográficas, grade, movimento de câmera) */
+  | "cinematicDark"
+  | "viralEnergetic"
+  | "luxuryGold"
+  | "corporateModern"
+  | "motivationalKinetic"
+  | "glitchTech"
+  | "emotionalStorytelling"
+  /** springTiming + camadas flare/matte/glitch + card de abertura (máximo Remotion transitions) */
+  | "masterDirector"
+  /** letterbox scope + grade quente + flare âmbar */
+  | "filmArc";
 
 export type SubtitleTheme = {
   fontFamily: string;
@@ -138,6 +150,51 @@ export const SUBTITLE_THEMES: Record<string, SubtitleTheme> = {
     bgColor: "transparent",
     position: "center",
   },
+  midnightBlue: {
+    fontFamily: "Arial Black, sans-serif",
+    fontSize: 46,
+    color: "#E8F4FF",
+    strokeColor: "#0A1628",
+    strokeWidth: 3,
+    bgColor: "rgba(15, 30, 60, 0.75)",
+    position: "bottom",
+  },
+  roseGold: {
+    fontFamily: "Georgia, serif",
+    fontSize: 42,
+    color: "#F5E6D3",
+    strokeColor: "#5C4033",
+    strokeWidth: 2,
+    bgColor: "rgba(60, 40, 35, 0.55)",
+    position: "center",
+  },
+  cyberPink: {
+    fontFamily: "Impact, sans-serif",
+    fontSize: 50,
+    color: "#FF2E97",
+    strokeColor: "#1A0A20",
+    strokeWidth: 4,
+    bgColor: "transparent",
+    position: "center",
+  },
+  slatePro: {
+    fontFamily: "system-ui, Segoe UI, sans-serif",
+    fontSize: 38,
+    color: "#F8FAFC",
+    strokeColor: "#0F172A",
+    strokeWidth: 2,
+    bgColor: "rgba(15, 23, 42, 0.82)",
+    position: "bottom",
+  },
+  amberViral: {
+    fontFamily: "Arial Black, sans-serif",
+    fontSize: 52,
+    color: "#FBBF24",
+    strokeColor: "#1C1917",
+    strokeWidth: 4,
+    bgColor: "rgba(0,0,0,0.35)",
+    position: "center",
+  },
 };
 
 export const VIDEO_STYLES: Record<VideoStyleId, { label: string; description: string }> = {
@@ -172,5 +229,41 @@ export const VIDEO_STYLES: Record<VideoStyleId, { label: string; description: st
   unboxing: {
     label: "Unboxing Reveal",
     description: "Revelação misteriosa com blur, zoom dramático e suspense",
+  },
+  cinematicDark: {
+    label: "Cinematic Dark",
+    description: "Grade fria, vinheta, grain leve, transições suaves tipo trailer",
+  },
+  viralEnergetic: {
+    label: "Viral Energetic",
+    description: "Cortes rápidos, flash, saturação alta, impacto TikTok/Reels",
+  },
+  luxuryGold: {
+    label: "Luxury Gold",
+    description: "Tons quentes, brilho dourado sutil, movimento Ken Burns elegante",
+  },
+  corporateModern: {
+    label: "Corporate Modern",
+    description: "Limpo, estável, transições slide/flip discretas",
+  },
+  motivationalKinetic: {
+    label: "Motivational Kinetic",
+    description: "Zoom dinâmico, parallax leve, energia de discurso motivacional",
+  },
+  glitchTech: {
+    label: "Glitch Tech",
+    description: "RGB split ocasional, transições agressivas, vibe tech",
+  },
+  emotionalStorytelling: {
+    label: "Emotional Storytelling",
+    description: "Ritmo mais lento, vinheta suave, foco narrativo emocional",
+  },
+  masterDirector: {
+    label: "Master Director Cut",
+    description: "Transições com física spring, iris/clock, glitch, flare, impacto máximo",
+  },
+  filmArc: {
+    label: "Film Arc Cinema",
+    description: "Letterbox 2.39:1, tons quentes, flare dourado, movimento clássico",
   },
 };

@@ -11,8 +11,13 @@ import {
 } from "lucide-react";
 import { VideoComposition } from "../../../../../remotion/VideoComposition";
 import {
-  VIDEO_STYLES, SUBTITLE_THEMES,
-  type VideoInputProps, type VideoStyleId, type MediaAsset, type CaptionWord, type SubtitleTheme,
+  VIDEO_STYLES,
+  SUBTITLE_THEMES,
+  type VideoInputProps,
+  type VideoStyleId,
+  type MediaAsset,
+  type CaptionWord,
+  type SubtitleTheme,
 } from "../../../../../remotion/types";
 import { useRemotionSandboxRender } from "../../../../hooks/use-remotion-sandbox-render";
 import { resolveInputPropsForRender } from "../../../../lib/remotion/resolve-input-props-for-render";
@@ -329,10 +334,35 @@ function VideoEditorPageInner() {
   const subtitleTheme: SubtitleTheme = SUBTITLE_THEMES[subtitleThemeKey] ?? SUBTITLE_THEMES.tiktokBold;
 
   const compositionProps: VideoInputProps = useMemo(() => ({
-    style: videoStyle, media: selectedAssets, voiceoverSrc: voiceAudioUrl ?? voicePreviewUrl, musicSrc: musicUrl,
-    musicVolume, captions, subtitleTheme, productName, price, ctaText, fps,
-    width: dimensions.width, height: dimensions.height, durationInFrames,
-  }), [videoStyle, selectedAssets, voiceAudioUrl, voicePreviewUrl, musicUrl, musicVolume, captions, subtitleTheme, productName, price, ctaText, dimensions, durationInFrames]);
+    style: videoStyle,
+    media: selectedAssets,
+    voiceoverSrc: voiceAudioUrl ?? voicePreviewUrl,
+    musicSrc: musicUrl,
+    musicVolume,
+    captions,
+    subtitleTheme,
+    productName,
+    price,
+    ctaText,
+    fps,
+    width: dimensions.width,
+    height: dimensions.height,
+    durationInFrames,
+  }), [
+    videoStyle,
+    selectedAssets,
+    voiceAudioUrl,
+    voicePreviewUrl,
+    musicUrl,
+    musicVolume,
+    captions,
+    subtitleTheme,
+    productName,
+    price,
+    ctaText,
+    dimensions,
+    durationInFrames,
+  ]);
 
   // ── Shopee search ──
   const handleShopeeSearch = useCallback(async () => {
@@ -687,9 +717,13 @@ function VideoEditorPageInner() {
       }
       setMusicTracks(json.tracks ?? []);
       if ((json.tracks ?? []).length === 0) {
-        setMusicLibraryError(
-          "Nenhuma música encontrada para esse estilo. Tente outro gênero."
-        );
+        if (json.jamendoConfigured === false && typeof json.message === "string") {
+          setMusicLibraryError(json.message);
+        } else {
+          setMusicLibraryError(
+            "Nenhuma música encontrada para esse estilo. Tente outro gênero."
+          );
+        }
       }
     } catch {
       setMusicTracks([]);
@@ -1710,7 +1744,7 @@ function VideoEditorPageInner() {
                   </div>
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-bold text-text-primary">Estilo das legendas</p>
-                <Tooltip text="Legendas em 3 palavras por vez, UPPERCASE, sincronizadas com a narração. Escolha a aparência (fonte, cor, posição)." wide />
+                <Tooltip text="Legendas em 2 palavras por vez (mais impacto), UPPERCASE, sincronizadas com a narração. Escolha a aparência (fonte, cor, posição)." wide />
                     </div>
                         </div>
             <div className="p-5 flex flex-col gap-2 flex-1">
@@ -1842,7 +1876,14 @@ function VideoEditorPageInner() {
                         : "—",
                     icon: Mic,
                   },
-                  { label: "Legendas", value: captions.length > 0 ? `${captions.length} palavras` : "—", icon: Sparkles },
+                  {
+                    label: "Legendas",
+                    value:
+                      captions.length > 0
+                        ? `${captions.length} palavras (animação cinematográfica fixa)`
+                        : "—",
+                    icon: Sparkles,
+                  },
                   { label: "Música", value: musicUrl ? `${Math.round(musicVolume * 100)}%` : "—", icon: Music },
                 ].map(({ label, value, icon: Icon }, i, arr) => (
                   <div key={label} className={`flex items-center gap-2.5 py-2.5 ${i < arr.length - 1 ? "border-b border-dark-border/30" : ""}`}>

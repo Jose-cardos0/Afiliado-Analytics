@@ -74,7 +74,9 @@ export const UGCStyleVideo: React.FC<VideoInputProps> = (props) => {
           return interpolate(f, [durationInFrames - fps * 2, durationInFrames], [vol, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
         }} loop />
       )}
-      {captions.length > 0 && <AnimatedCaption captions={captions} theme={subtitleTheme} />}
+      {captions.length > 0 && (
+        <AnimatedCaption captions={captions} theme={subtitleTheme} />
+      )}
     </AbsoluteFill>
   );
 };

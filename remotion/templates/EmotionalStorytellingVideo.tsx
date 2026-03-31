@@ -1,17 +1,29 @@
 import React from "react";
-import { AbsoluteFill, Sequence, Audio, interpolate, useVideoConfig } from "remotion";
-import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import { AbsoluteFill, Audio, interpolate, useVideoConfig } from "remotion";
+import { TransitionSeries, springTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
+import { slide } from "@remotion/transitions/slide";
 import type { VideoInputProps } from "../types";
 import { MediaScene } from "../components/MediaScene";
 import { AnimatedCaption } from "../components/AnimatedCaption";
 import { CTASlide } from "../components/CTASlide";
+import { ColorGradeOverlay } from "../components/ColorGradeOverlay";
 import { interleaveMedia } from "../utils";
 
-const EFFECTS = ["panRight", "zoomIn", "panLeft", "zoomOut"] as const;
+const EFFECTS = ["kenBurnsIn", "panRight", "kenBurnsOut", "zoomIn"] as const;
 
-export const StorytellingVideo: React.FC<VideoInputProps> = (props) => {
-  const { media: rawMedia, voiceoverSrc, musicSrc, musicVolume, captions, subtitleTheme, ctaText, productName, durationInFrames } = props;
+export const EmotionalStorytellingVideo: React.FC<VideoInputProps> = (props) => {
+  const {
+    media: rawMedia,
+    voiceoverSrc,
+    musicSrc,
+    musicVolume,
+    captions,
+    subtitleTheme,
+    ctaText,
+    productName,
+    durationInFrames,
+  } = props;
   const { fps } = useVideoConfig();
   const media = interleaveMedia(rawMedia);
 
@@ -19,7 +31,7 @@ export const StorytellingVideo: React.FC<VideoInputProps> = (props) => {
   const contentFrames = durationInFrames - ctaDuration;
   const scenesCount = media.length || 1;
   const framesPerScene = Math.max(fps * 2, Math.floor(contentFrames / scenesCount));
-  const transitionFrames = Math.round(fps * 0.8);
+  const transitionFrames = Math.round(fps * 0.95);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
@@ -28,25 +40,27 @@ export const StorytellingVideo: React.FC<VideoInputProps> = (props) => {
           <React.Fragment key={i}>
             <TransitionSeries.Sequence durationInFrames={framesPerScene}>
               <MediaScene asset={asset} effect={EFFECTS[i % EFFECTS.length]} />
-              {/* Vinheta escura nas bordas */}
-              <AbsoluteFill
-                style={{
-                  background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%)",
-                  pointerEvents: "none",
-                }}
-              />
+              <ColorGradeOverlay variant="emotionalSoft" grainAmount={0.14} vignetteAmount={0.62} />
             </TransitionSeries.Sequence>
             {i < media.length - 1 && (
               <TransitionSeries.Transition
-                presentation={fade()}
-                timing={linearTiming({ durationInFrames: transitionFrames })}
+                presentation={i % 2 === 0 ? fade() : slide({ direction: "from-bottom" })}
+                timing={springTiming({
+                  durationInFrames: transitionFrames,
+                  config: { damping: 22, stiffness: 72, mass: 0.85 },
+                  durationRestThreshold: 0.001,
+                })}
               />
             )}
           </React.Fragment>
         ))}
         <TransitionSeries.Transition
           presentation={fade()}
-          timing={linearTiming({ durationInFrames: Math.round(fps * 0.6) })}
+          timing={springTiming({
+            durationInFrames: Math.round(fps * 0.72),
+            config: { damping: 24, stiffness: 68, mass: 0.9 },
+            durationRestThreshold: 0.001,
+          })}
         />
         <TransitionSeries.Sequence durationInFrames={ctaDuration}>
           <CTASlide text={ctaText || "Confira o link"} productName={productName} />
