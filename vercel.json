@@ -8,7 +8,8 @@
   },
   "crons": [
     { "path": "/api/cron/expire-subscriptions", "schedule": "0 5 * * *" },
-    { "path": "/api/grupos-venda/cron-disparo", "schedule": "*/10 * * * *" }
+    { "path": "/api/grupos-venda/cron-disparo", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/espelhamento-payloads-retention", "schedule": "0 * * * *" }
   ],
   "rewrites": [
     {
