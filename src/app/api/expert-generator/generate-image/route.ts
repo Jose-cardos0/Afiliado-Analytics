@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient } from "../../../../../utils/supabase/server";
+import { AFILIADO_COINS_IMAGE_COST } from "@/lib/afiliado-coins";
+import { consumeAfiliadoCoins, refundAfiliadoCoins } from "@/lib/afiliado-coins-server";
 import { gateEspecialistaGenerate } from "@/lib/require-entitlements";
 import {
   buildExpertImagePrompt,
@@ -56,6 +59,24 @@ function parseModel(raw: unknown): ExpertModelSelection | null {
 export async function POST(req: Request) {
   const gate = await gateEspecialistaGenerate();
   if (!gate.allowed) return gate.response;
+
+  const supabase = await createClient();
+  const spent = await consumeAfiliadoCoins(
+    supabase,
+    gate.userId,
+    AFILIADO_COINS_IMAGE_COST,
+    "expert_image"
+  );
+  if (!spent.ok) {
+    return NextResponse.json(
+      {
+        error: `Saldo insuficiente: gerar a imagem custa ${AFILIADO_COINS_IMAGE_COST} Afiliado Coins. Compre mais coins ou aguarde o crédito mensal do Pro.`,
+        code: "INSUFFICIENT_COINS",
+        balance: spent.balance ?? 0,
+      },
+      { status: 403 }
+    );
+  }
 
   let body: unknown;
   try {
@@ -184,6 +205,12 @@ export async function POST(req: Request) {
     productWearOnModel,
   });
   if (!nb.ok) {
+    await refundAfiliadoCoins(
+      supabase,
+      gate.userId,
+      AFILIADO_COINS_IMAGE_COST,
+      "refund_expert_image_failed"
+    );
     const isKey = /GEMINI_API_KEY não configurada/i.test(nb.error);
     const quota =
       /quota|free_tier|exceeded your current quota|billing/i.test(

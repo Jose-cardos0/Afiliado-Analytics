@@ -36,7 +36,9 @@ export function PlanEntitlementsProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    // Só bloquear a UI no carregamento inicial. `refresh()` incrementa `tick` e não pode
+    // disparar `loading` — senão o ProFeatureGate desmonta a página inteira (ex.: modal + coins).
+    if (tick === 0) setLoading(true);
     fetch("/api/me/entitlements")
       .then((r) => r.json())
       .then((data) => {

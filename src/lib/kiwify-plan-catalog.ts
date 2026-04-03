@@ -64,13 +64,37 @@ function norm(id: string | null | undefined): string {
 }
 
 /**
+ * Kiwify pode enviar só o slug (`bkPvMEa`) ou URL (`https://pay.kiwify.com.br/bkPvMEa`).
+ */
+export function normalizeKiwifyCheckoutSlug(
+  raw: string | null | undefined
+): string {
+  let s = (raw ?? "").trim();
+  if (!s) return "";
+  const noQuery = s.split("?")[0]!.trim();
+  s = noQuery;
+  try {
+    if (s.includes("kiwify.com") || /^https?:\/\//i.test(s)) {
+      const href = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+      const u = new URL(href);
+      const parts = u.pathname.split("/").filter(Boolean);
+      const last = parts[parts.length - 1];
+      return (last ?? "").trim();
+    }
+  } catch {
+    /* slug solto */
+  }
+  return s;
+}
+
+/**
  * Resolve o tier a partir do checkout_link do webhook.
  * Retorna null se o checkout_link não for reconhecido.
  */
 export function resolveTierFromCheckoutLink(
   checkoutLink: string | null | undefined
 ): PlanTier | null {
-  const cl = norm(checkoutLink);
+  const cl = normalizeKiwifyCheckoutSlug(checkoutLink);
   if (!cl) return null;
   if (ALL_PRO_CHECKOUT_LINKS.has(cl)) return "pro";
   if (ALL_PADRAO_CHECKOUT_LINKS.has(cl)) return "padrao";
@@ -118,4 +142,43 @@ export function bestPlanTier(tiers: PlanTier[]): PlanTier {
   if (tiers.includes("pro")) return "pro";
   if (tiers.includes("padrao")) return "padrao";
   return "padrao";
+}
+
+/** Checkout links Kiwify → pacotes Afiliado Coins (campo `checkout_link` do webhook). */
+const AFILIADO_COINS_CHECKOUT_LINKS: Record<string, number> = {
+  bkPvMEa: 100,
+  xRCi6UB: 300,
+  zUjcXsG: 800,
+  d8VevfX: 1500,
+  pLNfiLh: 3500,
+  q6sCIdX: 10000,
+};
+
+/**
+ * Mapa extra via env: `KIWIFY_AFILIADO_COINS_MAP=slug1:100,slug2:300`
+ * (útil se criares um checkout novo na Kiwify com slug diferente do catálogo).
+ */
+function parseEnvAfiliadoCoinsMap(): Record<string, number> {
+  const raw = process.env.KIWIFY_AFILIADO_COINS_MAP?.trim();
+  if (!raw) return {};
+  const out: Record<string, number> = {};
+  for (const part of raw.split(",")) {
+    const idx = part.indexOf(":");
+    if (idx <= 0) continue;
+    const k = part.slice(0, idx).trim();
+    const n = parseInt(part.slice(idx + 1).trim(), 10);
+    if (k && Number.isFinite(n) && n > 0) out[k] = n;
+  }
+  return out;
+}
+
+/** Quantidade de coins do pack, ou 0 se não for compra de coins. */
+export function resolveAfiliadoCoinsFromKiwifyCheckout(
+  checkoutLink: string | null | undefined
+): number {
+  const k = normalizeKiwifyCheckoutSlug(checkoutLink);
+  if (!k) return 0;
+  const envMap = parseEnvAfiliadoCoinsMap();
+  if (envMap[k] !== undefined) return envMap[k]!;
+  return AFILIADO_COINS_CHECKOUT_LINKS[k] ?? 0;
 }

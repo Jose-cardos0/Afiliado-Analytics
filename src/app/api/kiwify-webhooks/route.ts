@@ -3,7 +3,12 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import * as SibApiV3Sdk from "@getbrevo/brevo"
-import { resolveTierFromKiwifyIds, bestPlanTier } from "@/lib/kiwify-plan-catalog"
+import {
+  resolveTierFromKiwifyIds,
+  bestPlanTier,
+  resolveAfiliadoCoinsFromKiwifyCheckout,
+  normalizeKiwifyCheckoutSlug,
+} from "@/lib/kiwify-plan-catalog"
 import type { PlanTier } from "@/lib/plan-entitlements"
 
 // ---------- Supabase (service role) ---------
@@ -393,10 +398,19 @@ export async function POST(req: NextRequest) {
   const data = payload as KiwifyWebhookPayload
 
   const supabase = admin()
-  const eventType = String(data.webhook_event_type || "")
+  const rootEventType =
+    isRecord(parsedObj) && typeof parsedObj.webhook_event_type === "string"
+      ? parsedObj.webhook_event_type
+      : ""
+  const eventType = String(data.webhook_event_type || rootEventType || "")
+
+  // Kiwify: painel/API usam `compra_aprovada`; payloads antigos às vezes vêm como `order_approved`.
+  const isPurchaseApproved =
+    eventType === "order_approved" || eventType === "compra_aprovada"
+  const isSubscriptionRenewed = eventType === "subscription_renewed"
 
   // 4) (resto do seu código: INALTERADO)
-  if (eventType === "order_approved" || eventType === "subscription_renewed") {
+  if (isPurchaseApproved || isSubscriptionRenewed) {
     const customer = data.Customer
     const product = data.Product
     if (!customer?.email) {
@@ -412,7 +426,11 @@ export async function POST(req: NextRequest) {
 
     const productId = String(product?.product_id || "")
     const providerSubId = data.subscription_id ? String(data.subscription_id) : `${data.order_id || ""}`
-    const checkoutLink = typeof data.checkout_link === "string" ? data.checkout_link.trim() : null
+    const checkoutRaw =
+      typeof data.checkout_link === "string" ? data.checkout_link.trim() : ""
+    const checkoutLink = checkoutRaw
+      ? normalizeKiwifyCheckoutSlug(checkoutRaw) || null
+      : null
 
     let accessUntil = deriveAccessUntil(sub)
     const frequency = sub?.plan?.frequency || null
@@ -539,6 +557,28 @@ export async function POST(req: NextRequest) {
 
     // 4.4 Recalcular agregado do profile
     await recomputeProfileStatus(supabase, email, userId!)
+
+    // 4.45 Compra de Afiliado Coins (checkout único; idempotente por order_id)
+    const coinPack = resolveAfiliadoCoinsFromKiwifyCheckout(checkoutLink)
+    const orderKeyRaw =
+      data.order_id != null
+        ? String(data.order_id)
+        : data.Order && typeof data.Order === "object" && (data.Order as KiwifyOrder).id != null
+          ? String((data.Order as KiwifyOrder).id)
+          : data.id != null
+            ? String(data.id)
+            : ""
+    const orderKey = orderKeyRaw.trim()
+    if (coinPack > 0 && userId && orderKey) {
+      const { error: coinErr } = await supabase.rpc("credit_afiliado_coins_kiwify", {
+        p_user_id: userId,
+        p_order_id: orderKey,
+        p_coins: coinPack,
+      })
+      if (coinErr) {
+        console.error("Kiwify afiliado_coins credit:", coinErr.message)
+      }
+    }
 
     // 4.5 E-mail de primeiro acesso (apenas novos)
     if (isNewUser) {

@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient } from "../../../../../utils/supabase/server";
+import { AFILIADO_COINS_VIDEO_COST } from "@/lib/afiliado-coins";
+import { consumeAfiliadoCoins, refundAfiliadoCoins } from "@/lib/afiliado-coins-server";
 import { gateEspecialistaGenerate } from "@/lib/require-entitlements";
 import {
   buildExpertImagePrompt,
@@ -31,6 +34,24 @@ function parseModel(raw: unknown): ExpertModelSelection | null {
 export async function POST(req: Request) {
   const gate = await gateEspecialistaGenerate();
   if (!gate.allowed) return gate.response;
+
+  const supabase = await createClient();
+  const spent = await consumeAfiliadoCoins(
+    supabase,
+    gate.userId,
+    AFILIADO_COINS_VIDEO_COST,
+    "expert_video"
+  );
+  if (!spent.ok) {
+    return NextResponse.json(
+      {
+        error: `Saldo insuficiente: gerar o vídeo custa ${AFILIADO_COINS_VIDEO_COST} Afiliado Coins.`,
+        code: "INSUFFICIENT_COINS",
+        balance: spent.balance ?? 0,
+      },
+      { status: 403 }
+    );
+  }
 
   let body: unknown;
   try {
@@ -146,6 +167,12 @@ export async function POST(req: Request) {
       modelId: process.env.VERTEX_VEO_MODEL ?? "veo-3.1-fast-generate-001",
     });
   } catch (e) {
+    await refundAfiliadoCoins(
+      supabase,
+      gate.userId,
+      AFILIADO_COINS_VIDEO_COST,
+      "refund_expert_video_failed"
+    );
     const msg = e instanceof Error ? e.message : "Erro Vertex Veo";
     console.error("expert-generator/veo-start", e);
     if (msg.includes("VERTEX_") || msg.includes("não configurado")) {

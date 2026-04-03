@@ -9,6 +9,7 @@ import {
   type PlanEntitlements,
   type PlanTier,
 } from "./plan-entitlements";
+import { ensureAfiliadoMonthlyProCoins } from "./afiliado-coins-server";
 
 export type PlanUsageSnapshot = {
   evolutionInstances: number;
@@ -17,10 +18,8 @@ export type PlanUsageSnapshot = {
   gruposVendaGroupsTotal: number;
   activeCampaigns: number;
   videoExportsToday: number;
-  /** Gerações do Gerador Especialista (imagem/voz) no dia UTC */
-  especialistaGenerationsToday: number;
-  /** Eventos de espelhamento gravados no dia UTC */
-  espelhamentoGruposToday: number;
+  /** Saldo Afiliado Coins (após crédito mensal Pro/Staff se aplicável). */
+  afiliadoCoins: number;
 };
 
 export function utcTodayYmd(): string {
@@ -109,8 +108,6 @@ export async function getUsageSnapshot(
     { count: groupsCount },
     { count: activeCampaignsCount },
     { count: exportsCount },
-    { count: especialistaCount },
-    { count: espelhamentoCount },
   ] = await Promise.all([
     supabase
       .from("evolution_instances")
@@ -138,17 +135,21 @@ export async function getUsageSnapshot(
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("export_day", utcTodayYmd()),
-    supabase
-      .from("especialistagenerate_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("generated_at", utcTodayYmd()),
-    supabase
-      .from("espelhamentogrupos_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("espelhado_at", utcTodayYmd()),
   ]);
+
+  let afiliadoCoins = 0;
+  try {
+    const { error: coinErr } = await ensureAfiliadoMonthlyProCoins(supabase, userId);
+    if (coinErr) console.warn("[plan-server] ensureAfiliadoMonthlyProCoins:", coinErr.message);
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("afiliado_coins")
+      .eq("id", userId)
+      .maybeSingle();
+    afiliadoCoins = typeof prof?.afiliado_coins === "number" ? prof.afiliado_coins : 0;
+  } catch (e) {
+    console.warn("[plan-server] afiliadoCoins snapshot:", e);
+  }
 
   return {
     evolutionInstances: evoCount ?? 0,
@@ -157,8 +158,7 @@ export async function getUsageSnapshot(
     gruposVendaGroupsTotal: groupsCount ?? 0,
     activeCampaigns: activeCampaignsCount ?? 0,
     videoExportsToday: exportsCount ?? 0,
-    especialistaGenerationsToday: especialistaCount ?? 0,
-    espelhamentoGruposToday: espelhamentoCount ?? 0,
+    afiliadoCoins,
   };
 }
 

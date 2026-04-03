@@ -30,6 +30,8 @@ import {
   Info,
 } from "lucide-react";
 import ProFeatureGate from "../ProFeatureGate";
+import { usePlanEntitlements } from "../PlanEntitlementsContext";
+import AfiliadoCoinsHeader from "@/app/components/afiliado/AfiliadoCoinsHeader";
 import {
   FEMALE_PRESETS,
   MALE_PRESETS,
@@ -358,6 +360,9 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 function ExpertGeneratorInner() {
+  const { usage, loading: planCtxLoading, refresh: refreshPlanUsage } =
+    usePlanEntitlements();
+
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [productBase64, setProductBase64] = useState<string | null>(null);
   const [productMime, setProductMime] = useState("image/jpeg");
@@ -775,6 +780,8 @@ function ExpertGeneratorInner() {
         error?: string;
         hint?: string;
         detail?: string;
+        code?: string;
+        balance?: number;
         imageBase64?: string;
         mimeType?: string;
         modelFaceReferenceCount?: number;
@@ -785,6 +792,13 @@ function ExpertGeneratorInner() {
         throw new Error(humanizeLargeRequestError(raw.slice(0, 200)));
       }
       if (!res.ok) {
+        void refreshPlanUsage();
+        if (data.code === "INSUFFICIENT_COINS") {
+          throw new Error(
+            data.error ||
+              "Saldo insuficiente de Afiliado Coins para gerar a imagem."
+          );
+        }
         const detailSlice =
           typeof data.detail === "string" && data.detail.trim()
             ? data.detail.trim().slice(0, 1500)
@@ -807,6 +821,7 @@ function ExpertGeneratorInner() {
             ? data.modelFaceReferenceCount
             : undefined,
       });
+      void refreshPlanUsage();
     } catch (e) {
       setGenImgErr(e instanceof Error ? e.message : "Erro ao gerar imagem.");
     } finally {
@@ -899,15 +914,24 @@ function ExpertGeneratorInner() {
       });
       const data = (await res.json()) as {
         error?: string;
+        code?: string;
         operationName?: string;
       };
       if (!res.ok) {
+        void refreshPlanUsage();
+        if (data.code === "INSUFFICIENT_COINS") {
+          throw new Error(
+            data.error ||
+              "Saldo insuficiente de Afiliado Coins para gerar o vídeo."
+          );
+        }
         throw new Error(data.error || "Falha ao iniciar Veo.");
       }
       if (!data.operationName) {
         throw new Error("Sem operationName.");
       }
       await pollVeo(data.operationName);
+      void refreshPlanUsage();
     } catch (e) {
       setVeoErr(e instanceof Error ? e.message : "Erro no vídeo.");
     } finally {
@@ -927,20 +951,32 @@ function ExpertGeneratorInner() {
   return (
     <div className="space-y-5 pb-16">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-shopee-orange/15 border border-shopee-orange/30 flex items-center justify-center shadow-[0_0_16px_rgba(238,77,45,0.15)]">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-shopee-orange/15 border border-shopee-orange/30 flex items-center justify-center shadow-[0_0_16px_rgba(238,77,45,0.15)] shrink-0">
             <Sparkles className="h-[18px] w-[18px] text-shopee-orange" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-base font-bold text-text-primary">
               Gerador de Especialista
             </h1>
-           
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-1 text-[11px] text-text-secondary/50">
-          <span className="font-semibold text-shopee-orange">{step}</span>
-          <span>/4 etapas</span>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <AfiliadoCoinsHeader
+            balance={
+              typeof usage?.afiliadoCoins === "number"
+                ? usage.afiliadoCoins
+                : null
+            }
+            loading={planCtxLoading}
+            onRefresh={refreshPlanUsage}
+          />
+          <div className="hidden md:flex flex-col items-end gap-0.5 text-[11px] text-text-secondary/50">
+            <span>
+              <span className="font-semibold text-shopee-orange">{step}</span>
+              <span>/4 etapas</span>
+            </span>
+          </div>
         </div>
       </div>
 

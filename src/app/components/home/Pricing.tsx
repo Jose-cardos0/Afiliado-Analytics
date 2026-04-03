@@ -71,7 +71,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
       'Espelhamento de Grupos: 10 Espelhamentos',
       'Site de captura: 5',
       'Instâncias conectadas: 2',
-      'Gerador de Especialistas',
+      'Gerador de Especialistas: 100 Afiliado Coins',
     ],
   },
 ]
