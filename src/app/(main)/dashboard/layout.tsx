@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Link2,
@@ -25,8 +25,6 @@ import {
   PlanEntitlementsProvider,
   usePlanEntitlements,
 } from "./PlanEntitlementsContext";
-
-const LS_KEY = "hasSeenCaptureFeature";
 
 /** Qual flag de `PlanEntitlements` libera o item na sidebar (não use só `tier === "pro"` — staff/custom também podem ter essas flags). */
 type ProSidebarFeature =
@@ -92,7 +90,7 @@ const sidebarNavItems: NavItem[] = [
     icon: <ShoppingBag className="h-5 w-5" />,
   },
   {
-    title: "Grupos de Venda",
+    title: "Automação de Grupos",
     href: "/dashboard/grupos-venda",
     icon: <MessageCircle className="h-5 w-5" />,
   },
@@ -154,27 +152,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     });
   }, [entitlements]);
 
-  // Badge "NOVO"
-  const [showCaptureBadge, setShowCaptureBadge] = useState(false);
-
-  useEffect(() => {
-    try {
-      const seen = localStorage.getItem(LS_KEY) === "true";
-      setShowCaptureBadge(!seen);
-    } catch {
-      setShowCaptureBadge(false);
-    }
-  }, []);
-
-  const markCaptureAsSeen = useCallback(() => {
-    try {
-      localStorage.setItem(LS_KEY, "true");
-    } catch {
-      // ignore
-    }
-    setShowCaptureBadge(false);
-  }, []);
-
   // Fechar com Escape e focar o primeiro link ao abrir
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -194,11 +171,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [isSidebarOpen]);
 
-  function handleItemClick(href: string) {
+  function handleItemClick() {
     setIsSidebarOpen(false);
-    if (href === "/dashboard/captura") {
-      markCaptureAsSeen();
-    }
   }
 
   return (
@@ -240,13 +214,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         >
           {visibleItems.map((item) => {
             const isActive = pathname === item.href;
-            const isCapture = item.href === "/dashboard/captura";
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => handleItemClick(item.href)}
+                onClick={() => handleItemClick()}
                 aria-current={isActive ? "page" : undefined}
                 className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive
@@ -263,16 +236,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
                   {item.locked && (
                     <Lock className="h-3 w-3 text-text-secondary/40 shrink-0" />
-                  )}
-
-                  {isCapture && showCaptureBadge && (
-                    <span
-                      className="px-2 py-0.5 rounded-full text-[10px] leading-none font-semibold bg-red-600/90 text-white border border-white/15"
-                      aria-label="Nova funcionalidade"
-                      title="Nova funcionalidade"
-                    >
-                      NOVO
-                    </span>
                   )}
                 </span>
               </Link>

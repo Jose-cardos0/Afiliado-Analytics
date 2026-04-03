@@ -33,6 +33,12 @@ const DESKTOP_PAGE_COUNT = Math.ceil(
   AFILIADO_COINS_PACKS.length / DESKTOP_PAGE_SIZE
 );
 
+function discountLabelForPack(coins: number): string | undefined {
+  if (coins === 3500) return "5% OFF";
+  if (coins === 10000) return "17% OFF";
+  return undefined;
+}
+
 function mobileCardScrollStep(el: HTMLElement): number {
   const li = el.querySelector("li");
   const gap =
@@ -45,7 +51,15 @@ function mobileCardScrollStep(el: HTMLElement): number {
   return Math.max(120, el.clientWidth * 0.82);
 }
 
-function CoinPackCard({ pack, priority }: { pack: AfiliadoCoinsPack; priority?: boolean }) {
+function CoinPackCard({
+  pack,
+  priority,
+  discountLabel,
+}: {
+  pack: AfiliadoCoinsPack;
+  priority?: boolean;
+  discountLabel?: string;
+}) {
   const imgSrc = PACK_IMAGE_SRC[pack.coins] ?? "/coins/100coins.png";
   return (
     <a
@@ -76,6 +90,24 @@ function CoinPackCard({ pack, priority }: { pack: AfiliadoCoinsPack; priority?: 
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-dark-bg via-transparent to-transparent opacity-90"
           aria-hidden
         />
+        {discountLabel ? (
+          <div
+            className="pointer-events-none absolute left-0 top-2 z-[15] sm:top-3"
+            role="presentation"
+          >
+            <span
+              className="
+                inline-block max-w-[calc(100%-0.5rem)] bg-shopee-orange text-white
+                text-[9px] sm:text-[10px] font-extrabold uppercase leading-tight tracking-wide
+                pl-2 pr-2.5 py-1 rounded-r-md
+                shadow-[2px_3px_10px_rgba(0,0,0,0.4)]
+                border border-white/25 border-l-0
+              "
+            >
+              {discountLabel}
+            </span>
+          </div>
+        ) : null}
       </div>
       <div className="flex flex-col flex-1 gap-1 px-3 pt-2.5 pb-3">
         <span className="text-lg font-bold text-text-primary tabular-nums">
@@ -170,9 +202,25 @@ export default function AfiliadoCoinsHeader({
           <div
             role="dialog"
             aria-labelledby="afiliado-coins-shop-title"
-            className="relative w-full max-w-[min(96vw,56rem)] rounded-2xl border border-dark-border bg-dark-card shadow-2xl max-h-[min(92vh,720px)] flex flex-col overflow-hidden"
+            className="relative w-full max-w-[min(96vw,56rem)] overflow-visible"
           >
-            <div className="shrink-0 flex items-start justify-between gap-2 border-b border-dark-border bg-dark-card px-4 py-3.5">
+            {/* Cutout estilo mockup: sai por cima do cartão (PNG com fundo transparente). */}
+            <div
+              className="pointer-events-none absolute left-0 sm:left-1 z-[60] -top-[3rem] max-sm:scale-[0.92] sm:-top-[5.25rem] w-[min(46vw,152px)] h-[min(54vw,190px)] sm:w-[188px] sm:h-[248px] max-sm:origin-bottom-left"
+              aria-hidden
+            >
+              <Image
+                src="/coins/espcoins.png"
+                alt=""
+                fill
+                className="object-contain object-left-bottom drop-shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+                sizes="(max-width: 640px) 46vw, 188px"
+                priority
+              />
+            </div>
+
+            <div className="flex flex-col overflow-hidden rounded-2xl border border-dark-border bg-dark-card shadow-2xl max-h-[min(92vh,720px)]">
+            <div className="relative z-10 shrink-0 flex items-start justify-between gap-2 border-b border-dark-border bg-dark-card px-4 py-3.5 pl-[min(42vw,7.25rem)] sm:pl-44">
               <div className="min-w-0">
                 <h2
                   id="afiliado-coins-shop-title"
@@ -183,12 +231,11 @@ export default function AfiliadoCoinsHeader({
                 <p className="text-[11px] text-text-secondary mt-1 leading-snug">
                   Preços e benefícios!
                 </p>
-             
               </div>
               <button
                 type="button"
                 onClick={() => setShopOpen(false)}
-                className="p-2 rounded-xl text-text-secondary hover:bg-white/5 hover:text-text-primary transition shrink-0"
+                className="relative z-[70] p-2 rounded-xl text-text-secondary hover:bg-white/5 hover:text-text-primary transition shrink-0"
                 aria-label="Fechar"
               >
                 <X className="h-4 w-4" />
@@ -220,7 +267,11 @@ export default function AfiliadoCoinsHeader({
                       key={p.coins}
                       className="shrink-0 snap-center w-[min(82vw,260px)] max-w-[260px]"
                     >
-                      <CoinPackCard pack={p} priority={i <= 1} />
+                      <CoinPackCard
+                        pack={p}
+                        priority={i <= 1}
+                        discountLabel={discountLabelForPack(p.coins)}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -304,6 +355,7 @@ export default function AfiliadoCoinsHeader({
                             <CoinPackCard
                               pack={p}
                               priority={pageIdx === 0 && i <= 1}
+                              discountLabel={discountLabelForPack(p.coins)}
                             />
                           </li>
                         ))}
@@ -382,6 +434,7 @@ export default function AfiliadoCoinsHeader({
               na tua conta (pode levar alguns minutos — atualiza a página para ver
               o saldo).
             </p>
+            </div>
           </div>
         </div>
       )}

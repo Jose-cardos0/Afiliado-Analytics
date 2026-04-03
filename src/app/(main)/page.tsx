@@ -120,7 +120,7 @@ export default function HomePage() {
             className="mx-auto mb-[44px] max-w-[560px] font-['Inter'] text-[clamp(1rem,2.5vw,1.2rem)] font-normal leading-[1.75] text-white/65"
           >
             O único ecossistema com{" "}
-            <strong className="font-bold text-white">11 ferramentas poderosas</strong>{" "}
+            <strong className="font-bold text-white">12 ferramentas poderosas</strong>{" "}
             que os super afiliados usam para faturar mais, trabalhar menos e{" "}
             <strong className="font-bold text-[#ff7a54]">dominar qualquer nicho.</strong>{" "}
             Agora com <strong className="font-semibold text-white/90">Espelhamento de Grupos</strong>, que
@@ -223,7 +223,7 @@ export default function HomePage() {
               </h2>
 
               <p className="mx-auto max-w-[640px] font-['Inter'] text-[17px] leading-[1.75] text-white/60">
-                Uma demo completa mostrando como as 11 ferramentas trabalham
+                Uma demo completa mostrando como as 12 ferramentas trabalham
                 juntas para multiplicar seus resultados — incluindo Espelhamento de Grupos, para replicar
                 ofertas de grupos de origem nos seus grupos de destino.
               </p>

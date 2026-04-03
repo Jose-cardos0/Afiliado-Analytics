@@ -477,7 +477,7 @@ function PlanCard({
 }
 
 export default function Pricing() {
-  const [quarterly, setQuarterly] = useState(true)
+  const [quarterly, setQuarterly] = useState(false)
 
   const biggestSaving = useMemo(() => {
     const values = subscriptionPlans.map((plan) => getPlanMeta(plan).quarterlySavePct)
