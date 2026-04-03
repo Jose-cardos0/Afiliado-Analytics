@@ -1,6 +1,7 @@
 /**
  * Pipeline chamado pelo n8n (Evolution → processar texto → webhook disparo WhatsApp).
  * Authorization: Bearer ESPELHAMENTO_N8N_SECRET
+ * Ambiente: ESPELHAMENTO_N8N_WEBHOOK_URL (obrigatório) — URL do webhook n8n de disparo; sem valor, retorna erro de configuração.
  *
  * Body JSON:
  * - instanceName (obrigatório)
@@ -21,10 +22,6 @@ import {
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-/** Webhook n8n só para disparo WhatsApp do espelhamento (Grupos de Venda usa outro URL). Sobrescreva com ESPELHAMENTO_N8N_WEBHOOK_URL se precisar. */
-const DEFAULT_ESPELHAMENTO_DISPARO_WEBHOOK =
-  "https://n8n.codenxtdesenvolvimento.online/webhook/Disparo-de-espelhamento";
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -217,8 +214,28 @@ export async function POST(req: NextRequest) {
     const imageDataUri =
       imageBase64Only && mimeClean ? `data:${mimeClean};base64,${imageBase64Only}` : "";
 
-    const webhookUrl =
-      (process.env.ESPELHAMENTO_N8N_WEBHOOK_URL ?? "").trim() || DEFAULT_ESPELHAMENTO_DISPARO_WEBHOOK;
+    const webhookUrl = (process.env.ESPELHAMENTO_N8N_WEBHOOK_URL ?? "").trim();
+    if (!webhookUrl) {
+      await insertPayload({
+        config_id: config.id,
+        id_mensagem_externa: idMensagem,
+        instancia_nome: instanceName,
+        grupo_origem_jid: grupoOrigemNorm,
+        texto_entrada: textoBruto,
+        texto_saida: textoSaida,
+        status: "erro",
+        erro_detalhe: "espelhamento_webhook_url_not_configured",
+      });
+      return NextResponse.json(
+        {
+          action: "error",
+          reason: "espelhamento_webhook_url_not_configured",
+          hint: "Defina ESPELHAMENTO_N8N_WEBHOOK_URL no ambiente (Vercel ou .env.local).",
+        },
+        { status: 200 }
+      );
+    }
+
     const hash = inst.hash ?? "";
     const groupIds = [...new Set(matchedConfigs.map((c) => normalizeGroupJid(c.grupo_destino_jid)))];
     const disparoPayload = {
@@ -238,37 +255,35 @@ export async function POST(req: NextRequest) {
 
     let webhookOk = false;
     let webhookStatus: number | null = null;
-    if (webhookUrl) {
-      const whRes = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(disparoPayload),
+    const whRes = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(disparoPayload),
+    });
+    webhookOk = whRes.ok;
+    webhookStatus = whRes.status;
+    if (!whRes.ok) {
+      const t = await whRes.text();
+      await insertPayload({
+        config_id: config.id,
+        id_mensagem_externa: idMensagem,
+        instancia_nome: instanceName,
+        grupo_origem_jid: grupoOrigemNorm,
+        texto_entrada: textoBruto,
+        texto_saida: textoSaida,
+        status: "erro",
+        erro_detalhe: `webhook_${whRes.status}: ${t.slice(0, 500)}`,
       });
-      webhookOk = whRes.ok;
-      webhookStatus = whRes.status;
-      if (!whRes.ok) {
-        const t = await whRes.text();
-        await insertPayload({
-          config_id: config.id,
-          id_mensagem_externa: idMensagem,
-          instancia_nome: instanceName,
-          grupo_origem_jid: grupoOrigemNorm,
-          texto_entrada: textoBruto,
-          texto_saida: textoSaida,
-          status: "erro",
-          erro_detalhe: `webhook_${whRes.status}: ${t.slice(0, 500)}`,
-        });
-        return NextResponse.json(
-          {
-            action: "error",
-            reason: "webhook_failed",
-            webhookStatus,
-            disparoPayload,
-            detail: t.slice(0, 200),
-          },
-          { status: 200 }
-        );
-      }
+      return NextResponse.json(
+        {
+          action: "error",
+          reason: "webhook_failed",
+          webhookStatus,
+          disparoPayload,
+          detail: t.slice(0, 200),
+        },
+        { status: 200 }
+      );
     }
 
     await insertPayload({
@@ -284,7 +299,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       action: "sent",
-      webhookDelivered: webhookOk || !webhookUrl,
+      webhookDelivered: webhookOk,
       webhookStatus,
       disparoPayload,
       textoSaida,

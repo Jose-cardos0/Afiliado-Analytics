@@ -169,8 +169,8 @@ No **HTTP Request**, body JSON:
 | **401** | `error` com texto de não autorizado | `Authorization` errado ou segredo não definido na Vercel. |
 | **400** | `instanceName, grupoOrigemJid...` ou `Ambíguo` | Campos faltando ou precisa de `userId`. |
 | **200** | `"action": "skip"` | Ver `reason` (`no_active_config_for_group`, `no_shopee_links`, `instance_not_found`, …). |
-| **200** | `"action": "sent"` | Processou; se `ESPELHAMENTO_N8N_WEBHOOK_URL` estiver na Vercel, o disparo WhatsApp foi tentado. |
-| **200** | `"action": "error"` | Shopee não configurada, falha na troca de link ou falha no webhook de disparo. |
+| **200** | `"action": "sent"` | Processou e o disparo ao n8n foi tentado (`ESPELHAMENTO_N8N_WEBHOOK_URL` obrigatório no servidor). |
+| **200** | `"action": "error"` | Shopee não configurada, `ESPELHAMENTO_N8N_WEBHOOK_URL` ausente, falha na troca de link ou falha no webhook de disparo. |
 
 ---
 
@@ -178,7 +178,7 @@ No **HTTP Request**, body JSON:
 
 - [ ] Migration `espelhamento_*` aplicada no Supabase.  
 - [ ] Na Vercel: `ESPELHAMENTO_N8N_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`.  
-- [ ] Opcional: `ESPELHAMENTO_N8N_WEBHOOK_URL` (webhook que envia para o WhatsApp, mesmo padrão do Grupos de Venda).  
+- [ ] Obrigatório: `ESPELHAMENTO_N8N_WEBHOOK_URL` (URL do webhook n8n que envia para o WhatsApp no fluxo de espelhamento).  
 - [ ] No app Afiliado Analytics: usuário com **Shopee** configurada + **config de espelhamento ativa** (origem = JID que chega no webhook).  
 - [ ] `instanceName` **igual** ao `nome_instancia` salvo no app.
 
