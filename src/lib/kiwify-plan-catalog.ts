@@ -182,3 +182,28 @@ export function resolveAfiliadoCoinsFromKiwifyCheckout(
   if (envMap[k] !== undefined) return envMap[k]!;
   return AFILIADO_COINS_CHECKOUT_LINKS[k] ?? 0;
 }
+
+/** Produto Kiwify "Afiliado Coins" (packs). */
+const AFILIADO_COINS_KIWIFY_PRODUCT_IDS = new Set([
+  "e62fb0f0-2d1e-11f1-b936-eb83c4eeb33b",
+]);
+
+function parseEnvAfiliadoCoinsProductIds(): Set<string> {
+  const raw = process.env.KIWIFY_AFILIADO_COINS_PRODUCT_IDS?.trim();
+  if (!raw) return new Set();
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+/**
+ * Linha em `subscriptions` que é só compra de coins — não deve alterar plan_tier no recálculo.
+ */
+export function isAfiliadoCoinsKiwifySubscriptionRow(row: {
+  checkout_url?: string | null;
+  product_id?: string | null;
+}): boolean {
+  if (resolveAfiliadoCoinsFromKiwifyCheckout(row.checkout_url) > 0) return true;
+  const pid = norm(row.product_id);
+  if (!pid) return false;
+  if (AFILIADO_COINS_KIWIFY_PRODUCT_IDS.has(pid)) return true;
+  return parseEnvAfiliadoCoinsProductIds().has(pid);
+}

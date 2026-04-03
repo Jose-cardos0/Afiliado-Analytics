@@ -2,13 +2,15 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import { createHmac, timingSafeEqual } from "crypto"
-import * as SibApiV3Sdk from "@getbrevo/brevo"
 import {
   resolveTierFromKiwifyIds,
   bestPlanTier,
   resolveAfiliadoCoinsFromKiwifyCheckout,
   normalizeKiwifyCheckoutSlug,
+  isAfiliadoCoinsKiwifySubscriptionRow,
 } from "@/lib/kiwify-plan-catalog"
+import { respondAfiliadoCoinsKiwifyApproved, type KiwifyCoinsPayload } from "@/lib/kiwify-afiliado-coins-webhook"
+import { sendKiwifySetupEmail } from "@/lib/kiwify-send-setup-email"
 import type { PlanTier } from "@/lib/plan-entitlements"
 
 // ---------- Supabase (service role) ---------
@@ -56,123 +58,6 @@ interface KiwifyWebhookPayload {
   Subscription?: KiwifySubscription
 }
 
-// ---------- Email de setup ----------
-async function sendSetupEmail(toEmail: string, toName: string, resetUrl: string) {
-  const api = new SibApiV3Sdk.TransactionalEmailsApi()
-  api.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY!)
-  const msg = new SibApiV3Sdk.SendSmtpEmail()
-  msg.sender = { name: "Afiliado Analytics", email: "nao-responda@afiliadoanalytics.com.br" }
-  msg.to = [{ email: toEmail, name: toName }]
-  msg.subject = "Bem-vindo(a) ao Afiliado Analytics"
-  msg.htmlContent = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Definir minha senha</title>
-</head>
-<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:Arial, Helvetica, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f5f5f5;">
-    <tr>
-      <td align="center" style="padding:40px 20px;">
-
-
-        <!-- Card -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px; background-color:#ffffff; border:1px solid #e0e0e0; border-radius:4px;">
-          
-          <!-- Logo/Brand -->
-          <tr>
-            <td align="center" style="padding:40px 0 30px 0;">
-              <div style="font-size:36px; line-height:1.2; font-weight:bold; letter-spacing:-1px; font-family:Arial, Helvetica, sans-serif;">
-                <span style="color:#222222;">Afiliado </span><span style="color:#EE4D2D;">Analytics</span>
-              </div>
-            </td>
-          </tr>
-
-
-          <!-- Título e intro -->
-          <tr>
-            <td style="padding:0 40px 20px 40px; text-align:center;">
-              <h1 style="font-size:24px; color:#222222; margin:0 0 10px 0; font-weight:bold;">Bem‑vindo(a), ${toName}!</h1>
-              <p style="font-size:16px; color:#555555; line-height:1.6; margin:0;">
-                Sua assinatura está ativa e sua conta já foi criada com sucesso. Para começar, defina sua senha abaixo e acesse o painel.
-              </p>
-            </td>
-          </tr>
-
-
-          <!-- Botão -->
-          <tr>
-            <td align="center" style="padding:20px 40px;">
-              <a href="${resetUrl}" target="_blank"
-                 style="background-color:#EE4D2D; color:#ffffff; padding:15px 30px; text-decoration:none; border-radius:3px; font-weight:bold; font-size:16px; display:inline-block; border-bottom:3px solid #D03F1E;">
-                Definir minha senha
-              </a>
-            </td>
-          </tr>
-
-
-          <!-- Observação pós-ação -->
-          <tr>
-            <td style="padding:0 40px 10px 40px; text-align:center;">
-              <p style="font-size:14px; color:#666666; margin:0;">
-                Depois de definir a senha, o acesso ao painel será imediato para acompanhar métricas.
-              </p>
-            </td>
-          </tr>
-
-
-          <!-- Fallback de link -->
-          <tr>
-            <td style="padding:10px 40px 30px 40px; text-align:center;">
-              <p style="font-size:14px; color:#666666; margin:0 0 8px 0;">
-                Se o botão não funcionar, clique no link abaixo:
-              </p>
-              <p style="font-size:12px; color:#3366cc; word-break:break-all; margin:0;">
-                <a href="${resetUrl}" target="_blank" style="color:#3366cc; text-decoration:underline;">${resetUrl}</a>
-              </p>
-            </td>
-          </tr>
-
-
-          <!-- Divisor -->
-          <tr>
-            <td style="padding:0 40px;">
-              <div style="border-top:1px solid #eeeeee; height:1px; line-height:1px;">&nbsp;</div>
-            </td>
-          </tr>
-
-
-          <!-- Avisos e suporte -->
-          <tr>
-            <td style="padding:20px 40px 30px 40px; text-align:center; font-size:14px; color:#888888;">
-              <p style="margin:0 0 10px 0;">Este link expira em 24 horas por segurança. Caso não tenha solicitado a criação desta conta, ignore este e‑mail.</p>
-              <p style="margin:0;">Dúvidas? <a href="mailto:suporte@afiliadoanalytics.com.br" target="_blank" style="color:#EE4D2D; text-decoration:none;">suporte@afiliadoanalytics.com.br</a></p>
-            </td>
-          </tr>
-
-
-        </table>
-
-
-        <!-- Rodapé -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:600px; margin-top:20px;">
-          <tr>
-            <td align="center" style="font-size:12px; color:#999999;">
-              <p style="margin:0;">&copy; 2025 Afiliado Analytics. Todos os direitos reservados.</p>
-            </td>
-          </tr>
-        </table>
-
-
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
-  await api.sendTransacEmail(msg)
-}
-
 // ---------- Utils ----------
 const iso = (s?: string | null) => {
   if (!s) return null
@@ -218,7 +103,12 @@ async function recomputeProfileStatus(supabase: ReturnType<typeof admin>, email:
     .select("status, access_until, plan_id, product_id, checkout_url")
     .eq("email", email)
 
-  const validSubs = (subs || []).filter((s) => {
+  // Compras de Afiliado Coins não são assinatura de plano — não entram no cálculo de tier.
+  const planRows = (subs || []).filter(
+    (s) => !isAfiliadoCoinsKiwifySubscriptionRow({ checkout_url: s.checkout_url, product_id: s.product_id })
+  )
+
+  const validSubs = planRows.filter((s) => {
     const au = s.access_until ? new Date(s.access_until).toISOString() : null
     const notRefunded = s.status !== "refunded"
     const notExpired = au ? au >= now : false
@@ -229,13 +119,12 @@ async function recomputeProfileStatus(supabase: ReturnType<typeof admin>, email:
   const anyValid = validSubs.length > 0
 
   const maxAccess =
-    (subs || [])
+    planRows
       .map((s) => s.access_until)
       .filter(Boolean)
       .sort()
       .slice(-1)[0] || null
 
-  // Resolve plan_tier from active subscriptions
   let planTier: PlanTier = "padrao"
   if (anyValid) {
     const tiers = validSubs.map((s) =>
@@ -249,6 +138,10 @@ async function recomputeProfileStatus(supabase: ReturnType<typeof admin>, email:
   }
 
   if (userId) {
+    const { data: profSnap } = await supabase.from("profiles").select("plan_tier").eq("id", userId).maybeSingle()
+    if (profSnap?.plan_tier === "staff") {
+      planTier = "staff"
+    }
     await supabase
       .from("profiles")
       .update({
@@ -432,6 +325,11 @@ export async function POST(req: NextRequest) {
       ? normalizeKiwifyCheckoutSlug(checkoutRaw) || null
       : null
 
+    const coinPackFromCheckout = resolveAfiliadoCoinsFromKiwifyCheckout(checkoutLink)
+    if (isPurchaseApproved && coinPackFromCheckout > 0) {
+      return respondAfiliadoCoinsKiwifyApproved(supabase, data as KiwifyCoinsPayload, eventType)
+    }
+
     let accessUntil = deriveAccessUntil(sub)
     const frequency = sub?.plan?.frequency || null
     const planId = sub?.plan?.id || null
@@ -558,7 +456,7 @@ export async function POST(req: NextRequest) {
     // 4.4 Recalcular agregado do profile
     await recomputeProfileStatus(supabase, email, userId!)
 
-    // 4.45 Compra de Afiliado Coins (checkout único; idempotente por order_id)
+    // Compras com pack de coins saem antes (não tocam em subscriptions). Aqui só diagnóstico se slug desconhecido.
     const coinPack = resolveAfiliadoCoinsFromKiwifyCheckout(checkoutLink)
     const orderKeyRaw =
       data.order_id != null
@@ -569,15 +467,28 @@ export async function POST(req: NextRequest) {
             ? String(data.id)
             : ""
     const orderKey = orderKeyRaw.trim()
-    if (coinPack > 0 && userId && orderKey) {
-      const { error: coinErr } = await supabase.rpc("credit_afiliado_coins_kiwify", {
-        p_user_id: userId,
-        p_order_id: orderKey,
-        p_coins: coinPack,
-      })
-      if (coinErr) {
-        console.error("Kiwify afiliado_coins credit:", coinErr.message)
-      }
+
+    const afiliadoCoinsPayload: {
+      checkout_slug: string | null
+      resolved_pack: number
+      order_id: string | null
+      credit_attempted: boolean
+      credit_ok: boolean | null
+      hint?: string
+    } = {
+      checkout_slug: checkoutLink,
+      resolved_pack: coinPack,
+      order_id: orderKey || null,
+      credit_attempted: false,
+      credit_ok: null,
+    }
+
+    if (checkoutLink && coinPack === 0) {
+      afiliadoCoinsPayload.hint =
+        "checkout_slug_not_in_catalog — adiciona KIWIFY_AFILIADO_COINS_MAP=slug:coins no deploy ou usa o link oficial do pack."
+    } else if (!checkoutLink && coinPack === 0) {
+      afiliadoCoinsPayload.hint =
+        "no_checkout_link — típico de alguns eventos; compras de coins precisam de checkout_link no payload."
     }
 
     // 4.5 E-mail de primeiro acesso (apenas novos)
@@ -635,18 +546,23 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        await sendSetupEmail(email, fullName, resetUrl)
+        await sendKiwifySetupEmail(email, fullName, resetUrl)
       } catch (e: unknown) {
         const warn = getErrorMessage(e)
         return NextResponse.json({
           ok: true,
           event: eventType,
           warn: `Usuário criado/profile gravado, mas falha ao enviar e-mail: ${warn}`,
+          afiliado_coins: afiliadoCoinsPayload,
         })
       }
     }
 
-    return NextResponse.json({ ok: true, event: eventType })
+    return NextResponse.json({
+      ok: true,
+      event: eventType,
+      afiliado_coins: afiliadoCoinsPayload,
+    })
   }
 
   if (eventType === "subscription_canceled") {
