@@ -8,14 +8,25 @@ export type PresetRefImage = { mimeType: string; base64: string };
 
 /**
  * Lê imagens em `src/lib/expert-generator/expert/<packId>/` para envio ao Gemini Image.
+ * `packId` pode ser aninhado (ex.: `mans/jose`).
  */
 export function loadPresetReferenceImages(packId: string): PresetRefImage[] {
+  const normalized = packId.replace(/\\/g, "/").trim();
+  if (!normalized || normalized.startsWith("/") || normalized.includes("..")) {
+    return [];
+  }
+  const segments = normalized.split("/").filter(Boolean);
   const dir = path.join(
     process.cwd(),
     "src/lib/expert-generator/expert",
-    packId
+    ...segments
   );
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        `[expert-generator] Pasta de referências não encontrada: ${dir} (packId=${packId})`
+      );
+    }
     return [];
   }
 
@@ -56,6 +67,12 @@ export function loadPresetReferenceImages(packId: string): PresetRefImage[] {
         : "image/jpeg";
 
     out.push({ mimeType, base64: buf.toString("base64") });
+  }
+
+  if (out.length === 0) {
+    console.warn(
+      `[expert-generator] Nenhuma imagem ref*.png|jpeg|webp em ${dir} (excl. card.*) — preset "${packId}" sem fotos para o Gemini.`
+    );
   }
 
   return out;

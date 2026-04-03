@@ -230,6 +230,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const warnings: string[] = [];
+  if (model.mode === "preset" && modelReferenceImages.length === 0) {
+    warnings.push(
+      "preset_sem_fotos_referencia: no deploy as imagens em src/lib/expert-generator/expert/<preset>/ podem não estar no bundle — confira outputFileTracingIncludes ou logs do servidor."
+    );
+  }
+
   return NextResponse.json({
     mimeType: nb.mimeType,
     imageBase64: nb.imageBase64,
@@ -239,5 +246,6 @@ export async function POST(req: Request) {
     imageProvider: "nano-banana" as const,
     /** Confirmação para o UI: fotos de rosto enviadas no pedido multimodal ao Gemini Image. */
     modelFaceReferenceCount: modelReferenceImages.length,
+    ...(warnings.length ? { warnings } : {}),
   });
 }

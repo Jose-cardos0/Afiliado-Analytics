@@ -68,15 +68,22 @@ export const FEMALE_PRESETS: PresetModel[] = [
   },
 ];
 
+/** Homens: só `jose` e `marcos` em `expert/mans/<id>/` (card.* + ref*.jpeg → Nano Banana). */
 export const MALE_PRESETS: PresetModel[] = [
-  { id: "andre", name: "André", promptEn: "Adult Brazilian man, casual street style, short hair, approachable." },
-  { id: "bruno", name: "Bruno", promptEn: "Adult Brazilian man, athletic build, simple t-shirt, natural skin texture." },
-  { id: "caio", name: "Caio", promptEn: "Adult Brazilian man, light stubble, warm smile, everyday apartment vibe." },
-  { id: "diego", name: "Diego", promptEn: "Adult Brazilian man, curly hair, creative casual look, candid posture." },
-  { id: "felipe", name: "Felipe", promptEn: "Adult Brazilian man, clean shave, office-casual, believable customer." },
-  { id: "gustavo", name: "Gustavo", promptEn: "Adult Brazilian man, broader build, simple clothes, real-life proportions." },
-  { id: "lucas", name: "Lucas", promptEn: "Adult Brazilian man, younger adult, hoodie or tee, natural hair." },
-  { id: "rafael", name: "Rafael", promptEn: "Adult Brazilian man, medium beard, confident but not model posing." },
+  {
+    id: "jose",
+    name: "José",
+    referencePackId: "mans/jose",
+    promptEn:
+      "Adult man — same facial identity as the reference face photos: match hair, skin tone, facial structure, age and build as in refs. Photoreal Brazilian UGC — not a different face.",
+  },
+  {
+    id: "marcos",
+    name: "Marcos",
+    referencePackId: "mans/marcos",
+    promptEn:
+      "Adult man — same facial identity as the reference face photos: match hair, skin tone, facial structure, age and build as in refs. Photoreal Brazilian UGC — not a different face.",
+  },
 ];
 
 export const SCENE_CHIPS: { id: string; label: string; promptEn: string }[] = [

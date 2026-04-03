@@ -55,6 +55,8 @@ import milenaCardImg from "@/lib/expert-generator/expert/milena/card.png";
 import mikoCardImg from "@/lib/expert-generator/expert/miko/card.png";
 import rosaCardImg from "@/lib/expert-generator/expert/rosa/card.jpeg";
 import sophiaCardImg from "@/lib/expert-generator/expert/sophia/card.png";
+import joseCardImg from "@/lib/expert-generator/expert/mans/jose/card.jpeg";
+import marcosCardImg from "@/lib/expert-generator/expert/mans/marcos/card.jpeg";
 
 const PRESET_THUMB_BY_ID: Partial<Record<string, StaticImageData>> = {
   milena: milenaCardImg,
@@ -65,6 +67,8 @@ const PRESET_THUMB_BY_ID: Partial<Record<string, StaticImageData>> = {
   rosa: rosaCardImg,
   luana: luanaCardImg,
   evy: evyCardImg,
+  jose: joseCardImg,
+  marcos: marcosCardImg,
 };
 
 /** Alinhado ao Gerador de Criativos (`video-editor/page.tsx`). */
@@ -433,6 +437,8 @@ function ExpertGeneratorInner() {
     mime: string;
     /** Quantas imagens de rosto foram enviadas ao Nano Banana neste pedido (preset ou tuas fotos). */
     modelFaceReferenceCount?: number;
+    /** Preset sem ficheiros ref no servidor (ex.: deploy Vercel sem tracing) — rosto pode não bater com a galeria. */
+    presetFaceRefsMissing?: boolean;
   } | null>(null);
   const [veoLoading, setVeoLoading] = useState(false);
   const [veoErr, setVeoErr] = useState<string | null>(null);
@@ -785,6 +791,7 @@ function ExpertGeneratorInner() {
         imageBase64?: string;
         mimeType?: string;
         modelFaceReferenceCount?: number;
+        warnings?: string[];
       } = {};
       try {
         data = JSON.parse(raw) as typeof data;
@@ -813,13 +820,15 @@ function ExpertGeneratorInner() {
       if (!data.imageBase64) {
         throw new Error("Resposta sem imagem.");
       }
+      const faceCount =
+        typeof data.modelFaceReferenceCount === "number"
+          ? data.modelFaceReferenceCount
+          : undefined;
       setImageResult({
         base64: data.imageBase64,
         mime: data.mimeType ?? "image/png",
-        modelFaceReferenceCount:
-          typeof data.modelFaceReferenceCount === "number"
-            ? data.modelFaceReferenceCount
-            : undefined,
+        modelFaceReferenceCount: faceCount,
+        presetFaceRefsMissing: modelMode === "preset" && faceCount === 0,
       });
       void refreshPlanUsage();
     } catch (e) {
@@ -832,7 +841,7 @@ function ExpertGeneratorInner() {
   const pollVeo = async (operationName: string) => {
     for (let i = 0; i < 60; i++) {
       setVeoProgress(
-        `A gerar vídeo no Vertex (Veo Fast)… ${i + 1}/60 (~3s entre tentativas)`
+        `A gerar vídeo!`
       );
       const res = await fetch("/api/expert-generator/veo-poll", {
         method: "POST",
@@ -1692,8 +1701,20 @@ function ExpertGeneratorInner() {
                       <Download className="h-4 w-4" />
                       Descarregar PNG/JPEG
                     </button>
-                    {typeof imageResult.modelFaceReferenceCount === "number" &&
-                    imageResult.modelFaceReferenceCount > 0 ? (
+                    {imageResult.presetFaceRefsMissing ? (
+                      <p className="text-center text-[10px] text-amber-400/95 leading-snug px-1">
+                        <strong>Atenção:</strong> neste pedido{" "}
+                        <strong>não</strong> foram enviadas fotos de referência do
+                        preset ao gerador (provável falta de ficheiros no servidor
+                        após deploy). O rosto pode não coincidir com a modelo
+                        escolhida. Faz redeploy com a pasta{" "}
+                        <code className="text-[9px] opacity-90">
+                          src/lib/expert-generator/expert
+                        </code>{" "}
+                        incluída no bundle.
+                      </p>
+                    ) : typeof imageResult.modelFaceReferenceCount === "number" &&
+                      imageResult.modelFaceReferenceCount > 0 ? (
                       <p className="text-center text-[10px] text-emerald-400/90 leading-snug px-1">
                         Neste pedido, foi enviado{" "}
                         <strong>
@@ -1743,7 +1764,7 @@ function ExpertGeneratorInner() {
       {step === 4 && (
         <CardShell
           icon={Film}
-          title="Vídeo com Veo 3.1 Fast"
+          title="Vídeo com IA"
         
           bodyClassName={
             imageResult
@@ -2258,7 +2279,7 @@ function ExpertGeneratorInner() {
                   Gerar roteiro com IA
                 </h2>
                 <p className="text-[11px] text-text-secondary mt-1 leading-relaxed">
-                  Descreva brevemente o produto. 
+                  Descreva o produto.
                 </p>
               </div>
               <button
@@ -2272,9 +2293,7 @@ function ExpertGeneratorInner() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <label className="text-[11px] font-semibold text-text-secondary block mb-1.5">
-              Descreva brevemente o seu produto
-            </label>
+          
             <textarea
               value={scriptIaBrief}
               onChange={(e) => setScriptIaBrief(e.target.value)}

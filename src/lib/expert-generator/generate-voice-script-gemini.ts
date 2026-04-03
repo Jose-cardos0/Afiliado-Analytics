@@ -9,7 +9,10 @@ export type VoiceScriptGeminiResult =
 
 type GeminiTextResponse = {
   error?: { message?: string; code?: number; status?: string };
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
+  candidates?: {
+    finishReason?: string;
+    content?: { parts?: { text?: string }[] };
+  }[];
 };
 
 const DEFAULT_TEXT_MODEL_CANDIDATES = [
@@ -25,18 +28,26 @@ function extractText(json: GeminiTextResponse): string | null {
   return t || null;
 }
 
+/**
+ * Teto de palavras pós-IA (~2–2,5 palavras/s em PT-BR).
+ * Chão no prompt: a IA deve preencher o tempo do vídeo, não responder com 3–5 palavras.
+ */
+const VOICE_SCRIPT_WORD_RANGE: Record<
+  4 | 6 | 8,
+  { min: number; max: number }
+> = {
+  4: { min: 7, max: 11 },
+  6: { min: 12, max: 16 },
+  8: { min: 18, max: 22 },
+};
+
 function buildPrompt(params: {
   productBrief: string;
   durationSeconds: 4 | 6 | 8;
   motionSummary: string;
   voiceGender: "female" | "male";
 }): string {
-  const wordHint =
-    params.durationSeconds === 4
-      ? "cerca de 35–55 palavras"
-      : params.durationSeconds === 6
-        ? "cerca de 55–80 palavras"
-        : "cerca de 80–110 palavras";
+  const { min, max } = VOICE_SCRIPT_WORD_RANGE[params.durationSeconds];
 
   const genderPt =
     params.voiceGender === "female"
@@ -45,7 +56,12 @@ function buildPrompt(params: {
 
   return `És copywriter para vídeos curtos verticais (UGC / direct response) em português do Brasil.
 
-O vídeo tem EXATAMENTE ${params.durationSeconds} segundos de duração. O texto falado deve caber nesse tempo ao ser lido em voz natural (nem muito lento nem corrido): ${wordHint}.
+O vídeo tem EXATAMENTE ${params.durationSeconds} segundos. Em fala natural de anúncio (PT-BR) cabem cerca de 2 a 2,5 palavras por segundo.
+
+REGRA DE COMPRIMENTO (obrigatória):
+- O monólogo deve ter ENTRE ${min} e ${max} palavras, inclusive. Conta as palavras antes de responder.
+- Para ${params.durationSeconds}s, mira o teto (${max} palavras): usa quase todo o tempo com 2 frases curtas ou uma frase + complemento (benefício, prova social leve ou CTA), sempre com frases COMPLETAS.
+- PROIBIDO: respostas ridiculamente curtas (ex.: 3 a 6 palavras). PROIBIDO: mais de ${max} palavras ou blocos longos tipo 35+ palavras.
 
 Produto (descrição breve do anunciante):
 ${params.productBrief.trim()}
@@ -56,14 +72,89 @@ ${params.motionSummary.trim() || "(não especificado)"}
 Escreve APENAS o texto que a pessoa vai FALAR em voz alta — primeira pessoa, conversacional, convincente, sem saudações genéricas longas, sem indicações de encenação entre parênteses, sem numeração, sem título.
 Tom: ${genderPt}.
 Não menciones duração, segundos, "este vídeo" ou a palavra "roteiro".
-Responde só com o monólogo, uma única sequência de frases.`;
+Responde só com o monólogo (${min}–${max} palavras, frases completas).`;
+}
+
+function truncateScriptToMaxWords(script: string, maxWords: number): string {
+  const trimmed = script.trim();
+  if (!trimmed) return trimmed;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return trimmed;
+  return words.slice(0, maxWords).join(" ");
+}
+
+function countWords(script: string): number {
+  const t = script.trim();
+  if (!t) return 0;
+  return t.split(/\s+/).filter(Boolean).length;
+}
+
+function buildExpandPrompt(params: {
+  durationSeconds: 4 | 6 | 8;
+  tooShortScript: string;
+  min: number;
+  max: number;
+}): string {
+  return `O roteiro abaixo tem poucas palavras para um vídeo de ${params.durationSeconds} segundos de voz. Reescreve sobre o MESMO produto/ideia, em português do Brasil, primeira pessoa, tom de influencer.
+
+Requisitos:
+- Entre ${params.min} e ${params.max} palavras (conta antes de responder).
+- Frases completas; não cortes a meio.
+- Não menciones duração, segundos ou "roteiro".
+
+Texto demasiado curto (expande e melhora):
+${params.tooShortScript.trim()}
+
+Responde só com o monólogo novo (${params.min}–${params.max} palavras).`;
+}
+
+/** Modelos 2.5 podem usar orçamento interno; 512 corta a meio da palavra ("Perfe…"). */
+const GEMINI_TEXT_MAX_OUTPUT_TOKENS = 8192;
+
+type GenerateOnceOk = {
+  ok: true;
+  script: string;
+  modelUsed: string;
+  finishReason: string;
+};
+type GenerateOnceFail = { ok: false; error: string; detail?: string };
+type GenerateOnceResult = GenerateOnceOk | GenerateOnceFail;
+
+function finishReasonHitLimit(reason: string): boolean {
+  const r = (reason || "").toUpperCase();
+  return r.includes("MAX") && r.includes("TOKEN");
+}
+
+/** Texto que parece cortado a meio (ex.: termina em "Perfe" sem ponto). */
+function looksLikeCutMidSentence(script: string): boolean {
+  const t = script.trim();
+  if (t.length < 8) return false;
+  if (/[.!?…]["']?\s*$/.test(t)) return false;
+  const parts = t.split(/\s+/).filter(Boolean);
+  const last = parts[parts.length - 1] ?? "";
+  /** Corte típico deixa radical curto (ex.: "Perfe"); palavras completas comuns no fim costumam ter 7+ letras. */
+  if (last.length < 4 || last.length > 6) return false;
+  if (!/^[A-Za-zÀ-ÿ-]+$/.test(last)) return false;
+  return true;
+}
+
+function buildRepairTruncationPrompt(script: string, maxWords: number): string {
+  return `O monólogo abaixo foi CORTADO no fim — a última palavra pode estar incompleta (ex.: "Perfe" em vez de "Perfeito") ou falta ponto final.
+
+Reescreve o monólogo COMPLETO em português do Brasil, primeira pessoa, tom de influencer/UGC, com frases fechadas e ponto final. No máximo ${maxWords} palavras no total. Mantém a mesma ideia e produto; não cries saudação nova.
+
+Texto cortado:
+${script.trim()}
+
+Responde só com o monólogo final completo.`;
 }
 
 async function generateOnce(
   model: string,
   apiKey: string,
-  prompt: string
-): Promise<VoiceScriptGeminiResult> {
+  prompt: string,
+  maxWords: number
+): Promise<GenerateOnceResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
@@ -73,7 +164,7 @@ async function generateOnce(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.75,
-        maxOutputTokens: 1024,
+        maxOutputTokens: GEMINI_TEXT_MAX_OUTPUT_TOKENS,
       },
     }),
   });
@@ -98,8 +189,8 @@ async function generateOnce(
     };
   }
 
-  const script = extractText(json);
-  if (!script) {
+  const scriptRaw = extractText(json);
+  if (!scriptRaw) {
     return {
       ok: false,
       error: "O Gemini não devolveu texto utilizável.",
@@ -107,7 +198,31 @@ async function generateOnce(
     };
   }
 
-  return { ok: true, script, modelUsed: model };
+  const finishReason = String(json.candidates?.[0]?.finishReason ?? "");
+  const script = truncateScriptToMaxWords(scriptRaw, maxWords);
+
+  return { ok: true, script, modelUsed: model, finishReason };
+}
+
+async function repairTruncatedScriptIfNeeded(
+  model: string,
+  apiKey: string,
+  script: string,
+  maxWords: number,
+  finishReason: string
+): Promise<string> {
+  const need =
+    finishReasonHitLimit(finishReason) || looksLikeCutMidSentence(script);
+  if (!need) return script;
+
+  const repair = await generateOnce(
+    model,
+    apiKey,
+    buildRepairTruncationPrompt(script, maxWords),
+    maxWords
+  );
+  if (!repair.ok) return script;
+  return repair.script;
 }
 
 function isModelNotFound(r: VoiceScriptGeminiResult): boolean {
@@ -132,6 +247,7 @@ export async function generateVoiceScriptWithGemini(params: {
 
   const envModel = process.env.GEMINI_TEXT_MODEL?.trim();
   const prompt = buildPrompt(params);
+  const maxWords = VOICE_SCRIPT_WORD_RANGE[params.durationSeconds].max;
 
   const ordered: string[] = envModel
     ? [
@@ -141,19 +257,56 @@ export async function generateVoiceScriptWithGemini(params: {
     : [...DEFAULT_TEXT_MODEL_CANDIDATES];
 
   const errors: string[] = [];
-  for (const model of ordered) {
-    const result = await generateOnce(model, apiKey, prompt);
-    if (result.ok) return result;
+  const { min } = VOICE_SCRIPT_WORD_RANGE[params.durationSeconds];
 
-    errors.push(`[${model}] ${result.error}`);
-    if (
-      /API key not valid|invalid api key|PERMISSION_DENIED/i.test(result.error)
-    ) {
-      return result;
+  for (const model of ordered) {
+    let gen = await generateOnce(model, apiKey, prompt, maxWords);
+    if (!gen.ok) {
+      errors.push(`[${model}] ${gen.error}`);
+      if (
+        /API key not valid|invalid api key|PERMISSION_DENIED/i.test(gen.error)
+      ) {
+        return gen;
+      }
+      if (!isModelNotFound(gen)) {
+        return gen;
+      }
+      continue;
     }
-    if (!isModelNotFound(result)) {
-      return result;
+
+    let script = await repairTruncatedScriptIfNeeded(
+      model,
+      apiKey,
+      gen.script,
+      maxWords,
+      gen.finishReason
+    );
+    script = truncateScriptToMaxWords(script, maxWords);
+
+    if (countWords(script) < min) {
+      const expandPrompt = buildExpandPrompt({
+        durationSeconds: params.durationSeconds,
+        tooShortScript: script,
+        min,
+        max: maxWords,
+      });
+      const expanded = await generateOnce(model, apiKey, expandPrompt, maxWords);
+      if (expanded.ok) {
+        let s2 = await repairTruncatedScriptIfNeeded(
+          model,
+          apiKey,
+          expanded.script,
+          maxWords,
+          expanded.finishReason
+        );
+        s2 = truncateScriptToMaxWords(s2, maxWords);
+        if (countWords(s2) >= min) {
+          script = s2;
+        }
+      }
     }
+
+    return { ok: true, script, modelUsed: gen.modelUsed };
   }
 
   return {

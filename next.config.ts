@@ -21,6 +21,13 @@ const nextConfig: NextConfig = {
   turbopack: { root },
   outputFileTracingRoot: root,
 
+  /** Fotos ref1–refN por preset (fs em runtime) — sem isto, na Vercel o tracing não copia a pasta e o Nano Banana fica só com texto. */
+  outputFileTracingIncludes: {
+    "/api/expert-generator/generate-image": [
+      "./src/lib/expert-generator/expert/**/*",
+    ],
+  },
+
   serverExternalPackages: [
     "@sparticuz/chromium",
     "puppeteer-core",
