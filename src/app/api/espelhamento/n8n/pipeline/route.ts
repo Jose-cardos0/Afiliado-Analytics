@@ -1,7 +1,8 @@
 /**
  * Pipeline chamado pelo n8n (Evolution → processar texto → webhook disparo WhatsApp).
  * Authorization: Bearer ESPELHAMENTO_N8N_SECRET
- * Ambiente: ESPELHAMENTO_N8N_WEBHOOK_URL (obrigatório) — URL do webhook n8n de disparo; sem valor, retorna erro de configuração.
+ * Ambiente: DEFAULT_ESPELHAMENTO_DISPARO_WEBHOOK (URL do webhook n8n de disparo).
+ * Se vazio, usa ESPELHAMENTO_N8N_WEBHOOK_URL (legado). Sem nenhum dos dois, retorna erro de configuração.
  *
  * Body JSON:
  * - instanceName (obrigatório)
@@ -22,6 +23,13 @@ import {
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** URL do workflow n8n que recebe o POST de disparo (grupo destino). Sem hardcode no código. */
+function getEspelhamentoDisparoWebhookUrl(): string {
+  const primary = (process.env.DEFAULT_ESPELHAMENTO_DISPARO_WEBHOOK ?? "").trim();
+  if (primary) return primary;
+  return (process.env.ESPELHAMENTO_N8N_WEBHOOK_URL ?? "").trim();
+}
 
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -214,7 +222,7 @@ export async function POST(req: NextRequest) {
     const imageDataUri =
       imageBase64Only && mimeClean ? `data:${mimeClean};base64,${imageBase64Only}` : "";
 
-    const webhookUrl = (process.env.ESPELHAMENTO_N8N_WEBHOOK_URL ?? "").trim();
+    const webhookUrl = getEspelhamentoDisparoWebhookUrl();
     if (!webhookUrl) {
       await insertPayload({
         config_id: config.id,
@@ -224,13 +232,14 @@ export async function POST(req: NextRequest) {
         texto_entrada: textoBruto,
         texto_saida: textoSaida,
         status: "erro",
-        erro_detalhe: "espelhamento_webhook_url_not_configured",
+        erro_detalhe: "espelhamento_disparo_webhook_url_not_configured",
       });
       return NextResponse.json(
         {
           action: "error",
-          reason: "espelhamento_webhook_url_not_configured",
-          hint: "Defina ESPELHAMENTO_N8N_WEBHOOK_URL no ambiente (Vercel ou .env.local).",
+          reason: "espelhamento_disparo_webhook_url_not_configured",
+          hint:
+            "Defina DEFAULT_ESPELHAMENTO_DISPARO_WEBHOOK no ambiente (Vercel ou .env.local). Opcionalmente ESPELHAMENTO_N8N_WEBHOOK_URL como legado se DEFAULT estiver vazio.",
         },
         { status: 200 }
       );
