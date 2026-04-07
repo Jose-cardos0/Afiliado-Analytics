@@ -18,10 +18,14 @@ import {
   ChevronRight,
   RotateCcw,
   LayoutTemplate,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 
 import { useSupabase } from "../../../components/auth/AuthProvider";
 import LoadingOverlay from "../../../components/ui/LoadingOverlay";
+import Toolist from "../../../components/ui/Toolist";
+import MetaSearchablePicker from "@/app/components/meta/MetaSearchablePicker";
 import { usePlanEntitlements } from "../PlanEntitlementsContext";
 
 import type { CaptureSiteRow, LayoutVariant, PageTemplate } from "./_lib/types";
@@ -41,7 +45,6 @@ import {
 } from "@/lib/capture-block-position";
 import {
   DEFAULT_OFERT_CAROUSEL_POSITION,
-  OFERT_CAROUSEL_POSITION_OPTIONS,
   carouselPublicUrls,
   normalizeOfertCarouselPosition,
   normalizeOfertCarouselSlots,
@@ -71,7 +74,19 @@ const VIP_PREVIEW_MOCKUP = {
    * Insets calibrados para o recorte coincidir com o buraco transparente (menos faixa preta).
    * top/bottom menores = conteúdo ocupa mais em altura; lados menores = mais largura.
    */
-  screen: { top: "5.65%", left: "4.55%", right: "4.55%", bottom: "6.05%" },
+  screen: { top: "5.65%", left: "4.55%", right: "2.55%", bottom: "6.05%" },
+} as const;
+
+/**
+ * `public/pc.png` (2330×1464) — área do display em % do retângulo **da própria imagem**
+ * (wrapper `w-fit` + img; evita desvio por letterboxing de `object-contain`).
+ * Tela do asset é branca opaca: a moldura fica por cima com `mix-blend-multiply` para o conteúdo/vídeo aparecer “dentro” do ecrã.
+ */
+const VIP_PREVIEW_PC_MOCKUP = {
+  src: "/pc.png",
+  w: 2330,
+  h: 1464,
+  screen: { top: "4.4%", left: "13.7%", right: "11.7%", bottom: "30.5%" },
 } as const;
 
 const DEFAULT_BUTTON_TEXT = "Acessar Grupo Vip";
@@ -157,8 +172,8 @@ export default function CapturaClient() {
   const [site, setSite] = useState<CaptureSiteRow | null>(null);
   const [mode, setMode] = useState<Mode>("empty");
 
-  // Wizard step (agora 3)
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Wizard: 1 slug/logo/cor · 2 textos · 3 link/pixel · 4 YouTube, carrossel, notificações
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Scroll reset: rolar até o Header ("Site de Captura ...")
   const pageHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -227,6 +242,8 @@ export default function CapturaClient() {
   }, [carouselSlotFile]);
   /** Overlay onde o toast VIP é portado no preview (não cobre o resto do dashboard). */
   const [vipPreviewToastRoot, setVipPreviewToastRoot] = useState<HTMLDivElement | null>(null);
+  /** Preview VIP: moldura celular ou notebook (`pc.png`). */
+  const [vipPreviewDevice, setVipPreviewDevice] = useState<"mobile" | "desktop">("mobile");
 
   // layout variant (icons | scarcity) — só página classic
   const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>("icons");
@@ -315,6 +332,49 @@ export default function CapturaClient() {
     }
     return out;
   }, [supabase, carouselBlobUrls, carouselSlotPath]);
+
+  /** Preview por slot (0–3) para o grid do passo 4. */
+  const carouselSlotPreviewByIndex = useMemo(() => {
+    const out: (string | null)[] = [null, null, null, null];
+    for (let i = 0; i < 4; i++) {
+      if (carouselBlobUrls[i]) {
+        out[i] = carouselBlobUrls[i];
+        continue;
+      }
+      if (supabase && carouselSlotPath[i]) {
+        const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(carouselSlotPath[i]!);
+        out[i] = data.publicUrl ?? null;
+      }
+    }
+    return out;
+  }, [supabase, carouselBlobUrls, carouselSlotPath]);
+
+  const blockPositionPickerOptions = useMemo(
+    () =>
+      CAPTURE_BLOCK_POSITION_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+        description:
+          o.value === "below_title"
+            ? "Zona logo abaixo do título"
+            : o.value === "above_cta"
+              ? "Antes do botão principal"
+              : o.value === "below_cta"
+                ? "Depois do botão e avisos"
+                : "Última área do card",
+      })),
+    [],
+  );
+
+  const notificationsPickerOptions = useMemo(
+    () =>
+      NOTIFICATIONS_POSITION_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+        description: o.value.replace(/_/g, " · "),
+      })),
+    [],
+  );
 
   const setLogoFromLogopath = useCallback(
     (logopath: string | null) => {
@@ -598,11 +658,26 @@ export default function CapturaClient() {
         return;
       }
       setStep(3);
+      return;
+    }
+
+    if (step === 3) {
+      const url = whatsappUrl.trim();
+      if (!isValidHttpUrl(url)) {
+        setError("Link do botão inválido (use uma URL http/https válida).");
+        return;
+      }
+      if (!isValidPixelId(metaPixelId)) {
+        setError("Meta Pixel ID inválido.");
+        return;
+      }
+      setStep(4);
     }
   }
 
   function goPrevStep() {
     setError(null);
+    if (step === 4) return setStep(3);
     if (step === 3) return setStep(2);
     if (step === 2) return setStep(1);
     setStep(1);
@@ -1394,7 +1469,7 @@ export default function CapturaClient() {
 
             <form
               onSubmit={(e) => {
-                if (step !== 3) {
+                if (step !== 4) {
                   e.preventDefault();
                   goNextStep();
                   return;
@@ -1663,7 +1738,7 @@ export default function CapturaClient() {
                 </div>
               )}
 
-              {/* STEP 3 */}
+              {/* STEP 3 — link + pixel */}
               {step === 3 && (
                 <div className="space-y-5">
                   <div>
@@ -1706,46 +1781,64 @@ export default function CapturaClient() {
                     )}
                   </div>
 
-                  <div>
-                    <label className={labelClass}>Vídeo do YouTube (opcional)</label>
+                  <p className="text-xs text-text-secondary/90 rounded-lg border border-dark-border bg-dark-bg/40 px-3 py-2">
+                    No passo seguinte você configura o vídeo do YouTube, o carrossel de ofertas e as notificações na
+                    página (modelos VIP).
+                  </p>
+                </div>
+              )}
+
+              {/* STEP 4 — YouTube, carrossel, notificações (layout compacto + modais estilo Meta) */}
+              {step === 4 && (
+                <div className="space-y-5">
+                  <div className="rounded-lg border border-dark-border bg-dark-bg/25 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-text-primary">YouTube</span>
+                        <Toolist
+                          wide
+                          variant="below"
+                          text="Opcional. Cole o link do vídeo ou só o ID (11 caracteres). A posição define onde o player aparece na página pública."
+                        />
+                      </div>
+                    </div>
                     <input
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       className={inputClass}
-                      placeholder="https://www.youtube.com/watch?v=… ou youtu.be/…"
+                      placeholder="https://youtube.com/watch?v=… ou ID do vídeo"
                     />
-                    <p className="mt-1.5 text-xs text-text-secondary/80">
-                      Escolha abaixo onde o player aparece na página (título, botão ou fim do card).
-                    </p>
                     {!!youtubeUrl.trim() && !isValidOptionalYoutubeUrl(youtubeUrl) && (
-                      <div className="mt-2 text-xs text-red-400">
-                        URL ou ID do YouTube inválido.
-                      </div>
+                      <div className="text-xs text-red-400">URL ou ID inválido.</div>
                     )}
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Posição do vídeo no site</label>
-                    <select
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="text-xs font-medium text-text-secondary">Posição do vídeo</span>
+                      <Toolist
+                        variant="below"
+                        text="Título, antes/depois do botão ou fim do card — igual às zonas do carrossel."
+                      />
+                    </div>
+                    <MetaSearchablePicker
                       value={youtubePosition}
-                      onChange={(e) => setYoutubePosition(normalizeYoutubePosition(e.target.value))}
-                      className={inputClass}
-                    >
-                      {CAPTURE_BLOCK_POSITION_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setYoutubePosition(normalizeYoutubePosition(v))}
+                      options={blockPositionPickerOptions}
+                      modalTitle="Posição do vídeo"
+                      modalDescription="Escolha a zona da página onde o player será exibido."
+                      searchPlaceholder="Filtrar posições…"
+                      emptyButtonLabel="Escolher posição"
+                      className="w-full"
+                    />
                   </div>
 
-                  <div className="rounded-lg border border-dark-border p-4 space-y-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <span className={labelClass}>Carrossel de ofertas</span>
-                        <p className="mt-1 text-xs text-text-secondary/80">
-                          Até 4 imagens (PNG, JPEG ou WebP, máx. 2 MB). Escolha onde aparece na página.
-                        </p>
+                  <div className="rounded-lg border border-dark-border bg-dark-bg/25 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-text-primary">Carrossel</span>
+                        <Toolist
+                          wide
+                          variant="below"
+                          text="Até 4 imagens: PNG, JPEG ou WebP, máximo 2 MB cada. Toque num slot para enviar ou trocar. Desligue o interruptor se não for usar."
+                        />
                       </div>
                       <button
                         type="button"
@@ -1765,86 +1858,129 @@ export default function CapturaClient() {
                     </div>
                     {ofertCarouselEnabled ? (
                       <>
-                        <div>
-                          <label className={labelClass}>Posição do carrossel</label>
-                          <select
-                            value={ofertCarouselPosition}
-                            onChange={(e) =>
-                              setOfertCarouselPosition(normalizeOfertCarouselPosition(e.target.value))
-                            }
-                            className={inputClass}
-                          >
-                            {OFERT_CAROUSEL_POSITION_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium text-text-secondary">Posição do bloco</span>
+                          <Toolist variant="below" text="Onde as imagens aparecem em relação ao título e ao botão." />
                         </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {([0, 1, 2, 3] as const).map((slot) => (
-                            <div key={slot} className="rounded-md border border-dark-border p-3">
-                              <label className="text-xs font-medium text-text-secondary">
-                                Imagem {slot + 1}
-                              </label>
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp"
-                                className="mt-1 block w-full text-xs text-text-secondary file:mr-2 file:rounded file:border-0 file:bg-dark-bg file:px-2 file:py-1"
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0] ?? null;
-                                  if (!f) return;
-                                  if (f.size > 2 * 1024 * 1024) {
-                                    setError("Imagem muito grande (máx. 2 MB).");
-                                    return;
-                                  }
-                                  if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
-                                    setError("Use PNG, JPEG ou WebP.");
-                                    return;
-                                  }
-                                  setCarouselSlotFile((prev) => {
-                                    const n = [...prev];
-                                    n[slot] = f;
-                                    return n;
-                                  });
-                                  setError(null);
-                                }}
-                              />
-                              {(carouselSlotPath[slot] || carouselSlotFile[slot]) && (
-                                <button
-                                  type="button"
-                                  className="mt-2 text-xs text-red-400/90 hover:underline"
-                                  onClick={() => {
+                        <MetaSearchablePicker
+                          value={ofertCarouselPosition}
+                          onChange={(v) =>
+                            setOfertCarouselPosition(normalizeOfertCarouselPosition(v))
+                          }
+                          options={blockPositionPickerOptions}
+                          modalTitle="Posição do carrossel"
+                          modalDescription="Zona da página para o bloco de imagens."
+                          searchPlaceholder="Filtrar posições…"
+                          emptyButtonLabel="Escolher posição"
+                          className="w-full"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          {([0, 1, 2, 3] as const).map((slot) => {
+                            const inputId = `capture-carousel-slot-${slot}`;
+                            const prevUrl = carouselSlotPreviewByIndex[slot];
+                            const hasFile = !!(carouselSlotPath[slot] || carouselSlotFile[slot]);
+                            return (
+                              <div
+                                key={slot}
+                                className="relative aspect-[5/4] overflow-hidden rounded-xl border border-dashed border-dark-border/90 bg-dark-bg/40 transition-colors hover:border-shopee-orange/35"
+                              >
+                                <input
+                                  id={inputId}
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0] ?? null;
+                                    e.target.value = "";
+                                    if (!f) return;
+                                    if (f.size > 2 * 1024 * 1024) {
+                                      setError("Imagem muito grande (máx. 2 MB).");
+                                      return;
+                                    }
+                                    if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
+                                      setError("Use PNG, JPEG ou WebP.");
+                                      return;
+                                    }
                                     setCarouselSlotFile((prev) => {
                                       const n = [...prev];
-                                      n[slot] = null;
+                                      n[slot] = f;
                                       return n;
                                     });
-                                    setCarouselSlotPath((prev) => {
-                                      const n = [...prev];
-                                      n[slot] = null;
-                                      return n;
-                                    });
+                                    setError(null);
                                   }}
-                                >
-                                  Remover
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                                />
+                                {prevUrl ? (
+                                  <>
+                                    <Image
+                                      src={prevUrl}
+                                      alt=""
+                                      fill
+                                      className="object-cover z-0"
+                                      sizes="200px"
+                                      unoptimized={prevUrl.startsWith("blob:")}
+                                    />
+                                    <label
+                                      htmlFor={inputId}
+                                      className="absolute inset-0 z-[1] cursor-pointer"
+                                      aria-label={`Trocar imagem do slot ${slot + 1}`}
+                                    />
+                                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/80 via-black/35 to-transparent px-2 pb-2 pt-8 text-center text-[10px] font-medium text-white/95">
+                                      Toque para trocar
+                                    </div>
+                                  </>
+                                ) : (
+                                  <label
+                                    htmlFor={inputId}
+                                    className="absolute inset-0 z-[1] flex cursor-pointer flex-col items-center justify-center gap-1 p-2 text-center"
+                                  >
+                                    <Plus className="h-6 w-6 text-text-secondary/80" aria-hidden />
+                                    <span className="text-[11px] font-semibold text-text-secondary">
+                                      Slot {slot + 1}
+                                    </span>
+                                    <span className="text-[10px] text-text-secondary/60">Toque para enviar</span>
+                                  </label>
+                                )}
+                                {hasFile ? (
+                                  <button
+                                    type="button"
+                                    className="absolute right-1.5 top-1.5 z-[3] flex h-7 w-7 items-center justify-center rounded-lg border border-dark-border bg-dark-card/95 text-text-secondary shadow hover:border-red-500/50 hover:text-red-400"
+                                    aria-label={`Remover imagem ${slot + 1}`}
+                                    onClick={(ev) => {
+                                      ev.preventDefault();
+                                      ev.stopPropagation();
+                                      setCarouselSlotFile((prev) => {
+                                        const n = [...prev];
+                                        n[slot] = null;
+                                        return n;
+                                      });
+                                      setCarouselSlotPath((prev) => {
+                                        const n = [...prev];
+                                        n[slot] = null;
+                                        return n;
+                                      });
+                                    }}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
                         </div>
                       </>
                     ) : null}
                   </div>
 
-                  {isVipPreview && (
-                    <div className="rounded-lg border border-dark-border p-4 space-y-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <span className={labelClass}>Notificações na página</span>
-                          <p className="mt-1 text-xs text-text-secondary/80">
-                            Cartões de “quem entrou” (ou cupom no modelo roleta). Desligue se não quiser.
-                          </p>
+                  {isVipPreview ? (
+                    <div className="rounded-lg border border-dark-border bg-dark-bg/25 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-text-primary">Notificações</span>
+                          <Toolist
+                            wide
+                            variant="below"
+                            text="Cartões tipo ‘alguém entrou’ ou cupom na roleta. Só neste modelo de página. Desligue para uma landing mais limpa."
+                          />
                         </div>
                         <button
                           type="button"
@@ -1862,26 +1998,34 @@ export default function CapturaClient() {
                           />
                         </button>
                       </div>
-                      {notificationsEnabled && (
-                        <div>
-                          <label className={labelClass}>Posição</label>
-                          <select
+                      {notificationsEnabled ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-text-secondary">Posição do cartão</span>
+                            <Toolist variant="below" text="Canto da tela ou centro, conforme o espaço do modelo." />
+                          </div>
+                          <MetaSearchablePicker
                             value={notificationsPosition}
-                            onChange={(e) =>
-                              setNotificationsPosition(
-                                normalizeNotificationsPosition(e.target.value),
-                              )
+                            onChange={(v) =>
+                              setNotificationsPosition(normalizeNotificationsPosition(v))
                             }
-                            className={inputClass}
-                          >
-                            {NOTIFICATIONS_POSITION_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                            options={notificationsPickerOptions}
+                            modalTitle="Posição da notificação"
+                            modalDescription="Onde o cartão aparece sobre a página."
+                            searchPlaceholder="Filtrar posições…"
+                            emptyButtonLabel="Escolher posição"
+                            className="w-full"
+                          />
+                        </>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg border border-dark-border/70 bg-dark-bg/15 px-3 py-2.5">
+                      <span className="text-xs text-text-secondary">Notificações</span>
+                      <Toolist
+                        variant="below"
+                        text="Só em modelos VIP. No clássico não há cartões sobre a página."
+                      />
                     </div>
                   )}
                 </div>
@@ -1889,7 +2033,7 @@ export default function CapturaClient() {
 
               {/* Footer steps */}
               <div className="pt-4 border-t border-dark-border flex items-center justify-between">
-                <div className="text-xs text-text-secondary">{step} de 3</div>
+                <div className="text-xs text-text-secondary">{step} de 4</div>
 
                 <div className="flex items-center gap-2">
                   {(step > 1 || (step === 1 && mode === "create")) && (
@@ -1907,7 +2051,7 @@ export default function CapturaClient() {
                     </button>
                   )}
 
-                  {step < 3 && (
+                  {step < 4 && (
                     <button
                       type="button"
                       onClick={goNextStep}
@@ -1922,7 +2066,7 @@ export default function CapturaClient() {
               </div>
 
               {/* Buttons */}
-              {step === 3 && (
+              {step === 4 && (
                 <div className="pt-3 flex items-center justify-end gap-2">
                   <button
                     type="submit"
@@ -1948,72 +2092,155 @@ export default function CapturaClient() {
           <div className="lg:sticky lg:top-6 self-start">
             {isVipPreview ? (
               <div className="rounded-lg border border-dark-border overflow-hidden bg-dark-card">
-                <div className="px-4 py-3 border-b border-dark-border flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-dark-border flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-text-primary">Preview (modelo VIP)</div>
-                  <div className="text-xs text-text-secondary">Tempo real</div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="inline-flex rounded-lg border border-dark-border bg-dark-bg/80 p-0.5"
+                      role="group"
+                      aria-label="Dispositivo do preview"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setVipPreviewDevice("mobile")}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                          vipPreviewDevice === "mobile"
+                            ? "bg-shopee-orange text-white shadow-sm"
+                            : "text-text-secondary hover:text-text-primary hover:bg-dark-card"
+                        }`}
+                        title="Ver no celular"
+                        aria-pressed={vipPreviewDevice === "mobile"}
+                      >
+                        <Smartphone className="h-4 w-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVipPreviewDevice("desktop")}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                          vipPreviewDevice === "desktop"
+                            ? "bg-shopee-orange text-white shadow-sm"
+                            : "text-text-secondary hover:text-text-primary hover:bg-dark-card"
+                        }`}
+                        title="Ver no PC"
+                        aria-pressed={vipPreviewDevice === "desktop"}
+                      >
+                        <Monitor className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                    <span className="text-xs text-text-secondary hidden sm:inline">Tempo real</span>
+                  </div>
                 </div>
                 <CapturePreviewPortalContext.Provider value={{ root: vipPreviewToastRoot }}>
                   <div className="relative flex h-[min(78vh,820px)] max-h-[min(78vh,820px)] flex-col overflow-hidden bg-black/30">
                     <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4">
-                      <div
-                        className="relative mx-auto h-full max-h-full w-auto max-w-[min(100%,320px)] shrink-0"
-                        style={{ aspectRatio: `${VIP_PREVIEW_MOCKUP.w} / ${VIP_PREVIEW_MOCKUP.h}` }}
-                      >
-                        {/* Conteúdo da página “dentro” da tela (por baixo do PNG transparente) */}
-                        <div
-                          className="absolute z-[1] overflow-hidden rounded-[3.05rem] sm:rounded-[3.2rem]"
-                          style={VIP_PREVIEW_MOCKUP.screen}
-                        >
-                          <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
-                            <CaptureVipLanding
-                              variant={
-                                pageTemplate === "vip_terroso"
-                                  ? "vip_terroso"
-                                  : pageTemplate === "vinho_rose"
-                                    ? "vinho_rose"
-                                    : pageTemplate === "the_new_chance"
-                                      ? "the_new_chance"
-                                      : pageTemplate === "aurora_ledger"
-                                        ? "aurora_ledger"
-                                        : pageTemplate === "jardim_floral"
-                                          ? "jardim_floral"
-                                          : "vip_rosa"
-                              }
-                              title={previewTitle}
-                              description={previewDesc}
-                              buttonText={previewButtonText}
-                              ctaHref={previewButtonUrl.trim() ? previewButtonUrl : "#"}
-                              logoUrl={previewLogoSrc}
-                              buttonColor={previewColor}
-                              youtubeUrl={youtubeUrl.trim() || null}
-                              youtubePosition={youtubePosition}
-                              previewMode
-                              notificationsEnabled={notificationsEnabled}
-                              notificationsPosition={notificationsPosition}
-                              ofertCarouselEnabled={ofertCarouselEnabled}
-                              ofertCarouselPosition={ofertCarouselPosition}
-                              ofertCarouselImageUrls={ofertCarouselPreviewUrls}
+                      {(() => {
+                        const mock =
+                          vipPreviewDevice === "mobile" ? VIP_PREVIEW_MOCKUP : VIP_PREVIEW_PC_MOCKUP;
+                        const screenRoundClass =
+                          vipPreviewDevice === "mobile"
+                            ? "rounded-[3.05rem] sm:rounded-[3.2rem]"
+                            : "rounded-md sm:rounded-lg";
+                        const frameMaxWClass =
+                          vipPreviewDevice === "mobile"
+                            ? "max-w-[min(100%,320px)]"
+                            : "max-w-[min(100%,min(920px,96vw))]";
+                        const isMobileFrame = vipPreviewDevice === "mobile";
+
+                        const vipLanding = (
+                          <CaptureVipLanding
+                            variant={
+                              pageTemplate === "vip_terroso"
+                                ? "vip_terroso"
+                                : pageTemplate === "vinho_rose"
+                                  ? "vinho_rose"
+                                  : pageTemplate === "the_new_chance"
+                                    ? "the_new_chance"
+                                    : pageTemplate === "aurora_ledger"
+                                      ? "aurora_ledger"
+                                      : pageTemplate === "jardim_floral"
+                                        ? "jardim_floral"
+                                        : "vip_rosa"
+                            }
+                            title={previewTitle}
+                            description={previewDesc}
+                            buttonText={previewButtonText}
+                            ctaHref={previewButtonUrl.trim() ? previewButtonUrl : "#"}
+                            logoUrl={previewLogoSrc}
+                            buttonColor={previewColor}
+                            youtubeUrl={youtubeUrl.trim() || null}
+                            youtubePosition={youtubePosition}
+                            previewMode
+                            notificationsEnabled={notificationsEnabled}
+                            notificationsPosition={notificationsPosition}
+                            ofertCarouselEnabled={ofertCarouselEnabled}
+                            ofertCarouselPosition={ofertCarouselPosition}
+                            ofertCarouselImageUrls={ofertCarouselPreviewUrls}
+                          />
+                        );
+
+                        if (isMobileFrame) {
+                          return (
+                            <div
+                              className={`relative mx-auto h-full max-h-full w-auto shrink-0 ${frameMaxWClass}`}
+                              style={{ aspectRatio: `${mock.w} / ${mock.h}` }}
+                            >
+                              <div
+                                className={`absolute z-[1] overflow-hidden ${screenRoundClass}`}
+                                style={mock.screen}
+                              >
+                                <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                                  {vipLanding}
+                                </div>
+                              </div>
+                              <div
+                                ref={setVipPreviewToastRoot}
+                                className="pointer-events-none absolute z-[40]"
+                                style={mock.screen}
+                                aria-hidden
+                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={mock.src}
+                                alt=""
+                                width={mock.w}
+                                height={mock.h}
+                                className="pointer-events-none absolute inset-0 z-[50] h-full w-full select-none object-contain"
+                                draggable={false}
+                              />
+                            </div>
+                          );
+                        }
+
+                        /* PC: wrapper com o tamanho exato do PNG (sem letterboxing) + moldura por cima;
+                         * multiply faz a tela branca “deixar passar” o iframe/conteúdo por baixo. */
+                        return (
+                          <div className="isolate relative mx-auto inline-block max-h-full max-w-[min(920px,96vw)] leading-none">
+                            <div
+                              className={`absolute z-[1] overflow-hidden ${screenRoundClass}`}
+                              style={VIP_PREVIEW_PC_MOCKUP.screen}
+                            >
+                              <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                                {vipLanding}
+                              </div>
+                            </div>
+                            <div
+                              ref={setVipPreviewToastRoot}
+                              className="pointer-events-none absolute z-[40]"
+                              style={VIP_PREVIEW_PC_MOCKUP.screen}
+                              aria-hidden
+                            />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={VIP_PREVIEW_PC_MOCKUP.src}
+                              alt=""
+                              width={VIP_PREVIEW_PC_MOCKUP.w}
+                              height={VIP_PREVIEW_PC_MOCKUP.h}
+                              className="relative z-50 block h-auto max-h-[min(calc(78vh-5rem),760px)] w-auto max-w-full select-none object-contain mix-blend-multiply pointer-events-none"
+                              draggable={false}
                             />
                           </div>
-                        </div>
-                        {/* Toasts só na área da tela (canto do ecrã, não da moldura) */}
-                        <div
-                          ref={setVipPreviewToastRoot}
-                          className="pointer-events-none absolute z-[40]"
-                          style={VIP_PREVIEW_MOCKUP.screen}
-                          aria-hidden
-                        />
-                        {/* Moldura por cima (z maior); centro transparente mostra conteúdo + toasts por baixo */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={VIP_PREVIEW_MOCKUP.src}
-                          alt=""
-                          width={VIP_PREVIEW_MOCKUP.w}
-                          height={VIP_PREVIEW_MOCKUP.h}
-                          className="pointer-events-none absolute inset-0 z-[50] h-full w-full select-none object-contain"
-                          draggable={false}
-                        />
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </CapturePreviewPortalContext.Provider>

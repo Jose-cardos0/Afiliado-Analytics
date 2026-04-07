@@ -13,13 +13,22 @@ interface CustomSelectProps {
   onChange: (value: string) => void;
   options: Option[];
   className?: string;
+  /** Texto quando não há opção correspondente ao `value`. */
+  placeholder?: string;
 }
 
-export default function CustomSelect({ value, onChange, options, className = "" }: CustomSelectProps) {
+export default function CustomSelect({
+  value,
+  onChange,
+  options,
+  className = "",
+  placeholder = "Selecionar…",
+}: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value);
+  const buttonLabel = selectedOption?.label ?? placeholder;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -45,7 +54,7 @@ export default function CustomSelect({ value, onChange, options, className = "" 
         onClick={() => setIsOpen(!isOpen)}
         className="appearance-none w-full pl-4 pr-10 py-2.5 bg-dark-card border-2 border-dark-border rounded-full text-text-primary text-sm font-medium hover:border-shopee-orange/50 focus:outline-none focus:ring-2 focus:ring-shopee-orange/30 focus:border-shopee-orange cursor-pointer transition-all text-left"
       >
-        {selectedOption?.label}
+        {buttonLabel}
       </button>
 
       {/* Ícone Chevron */}
@@ -58,7 +67,7 @@ export default function CustomSelect({ value, onChange, options, className = "" 
       {/* Dropdown Menu */}
       {isOpen && (
         <div 
-          className="absolute top-full left-0 right-0 mt-2 border border-dark-border rounded-lg shadow-xl overflow-hidden z-50 animate-fade-in"
+          className="absolute top-full left-0 right-0 mt-2 border border-dark-border rounded-lg shadow-xl overflow-hidden z-[200] animate-fade-in"
           style={{ backgroundColor: '#1F1F23' }}
         >
           {options.map((option) => {
