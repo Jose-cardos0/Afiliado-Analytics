@@ -3,7 +3,7 @@
  * `legacy` = mesmo comportamento que `padrao` (usuários antigos não ganham “tudo ilimitado”).
  */
 
-export type PlanTier = "legacy" | "padrao" | "pro" | "staff";
+export type PlanTier = "legacy" | "padrao" | "pro" | "staff" | "trial";
 
 export type GruposVendaLimits = {
   /** Campanhas ativas no máximo */
@@ -77,6 +77,33 @@ const PADRAO_LIMITS = {
   especialistagenerate: false,
 } as const satisfies PlanEntitlements;
 
+/** Trial por cupom: só comissões, cliques, redirecionador, gerador Shopee e 1 captura. */
+const TRIAL_LIMITS = {
+  analiseComissoes: true,
+  analiseCliques: true,
+  meusLinks: true,
+  captureLinks: 1,
+  gpl: {
+    enabled: false,
+    showSummaryCards: false,
+    showGroupsCampaignsInstance: false,
+  },
+  geradorLinksShopee: true,
+  gruposVenda: {
+    maxActiveCampaigns: 0,
+    maxLists: 0,
+    maxGroupsTotal: 0,
+  },
+  evolutionInstances: 0,
+  ati: false,
+  criarCampanhaMeta: false,
+  geradorCriativos: false,
+  videoExportsPerDay: null,
+  voicegenerate: 0,
+  espelhamentogrupos: false,
+  especialistagenerate: false,
+} as const satisfies PlanEntitlements;
+
 const PRO_LIMITS = {
   analiseComissoes: true,
   analiseCliques: true,
@@ -137,11 +164,13 @@ export const LIMITS: Record<PlanTier, PlanEntitlements> = {
   padrao: { ...PADRAO_LIMITS, gpl: { ...PADRAO_LIMITS.gpl }, gruposVenda: { ...PADRAO_LIMITS.gruposVenda } },
   pro: { ...PRO_LIMITS, gpl: { ...PRO_LIMITS.gpl }, gruposVenda: { ...PRO_LIMITS.gruposVenda } },
   staff: { ...STAFF_LIMITS, gpl: { ...STAFF_LIMITS.gpl }, gruposVenda: { ...STAFF_LIMITS.gruposVenda } },
+  trial: { ...TRIAL_LIMITS, gpl: { ...TRIAL_LIMITS.gpl }, gruposVenda: { ...TRIAL_LIMITS.gruposVenda } },
 };
 
 export function getEntitlementsForTier(tier: PlanTier | string | null | undefined): PlanEntitlements {
   if (tier === "pro") return LIMITS.pro;
   if (tier === "staff") return LIMITS.staff;
+  if (tier === "trial") return LIMITS.trial;
   if (tier === "padrao" || tier === "legacy") return LIMITS.padrao;
   // fallback seguro até existir plan_tier no profile
   return LIMITS.legacy;

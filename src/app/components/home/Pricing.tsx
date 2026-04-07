@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { useLoginModal } from '@/app/components/auth/LoginModalProvider'
 
 type SubscriptionPlan = {
   name: string
@@ -123,6 +124,75 @@ function getPlanMeta(plan: SubscriptionPlan) {
     monthlySave,
     monthlySavePct,
   }
+}
+
+const freeTrialFeatures = [
+  'Análise de comissões',
+  'Análise de cliques',
+  'Redirecionador de Links',
+  'Gerador de links Shopee',
+  'Site de captura: 1',
+]
+
+function FreeTrialCard({ onStart, index }: { onStart: () => void; index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ duration: 0.5, delay: index * 0.12, ease: 'easeOut' }}
+      className="h-full"
+    >
+      <div className="group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[rgba(52,211,153,0.22)] bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(6,78,59,0.20)_100%)] px-[28px] py-[34px] shadow-[0_10px_40px_rgba(0,0,0,0.22)] backdrop-blur-[16px] transition-all duration-300 ease-in hover:-translate-y-[6px] hover:border-[rgba(52,211,153,0.35)] hover:shadow-[0_24px_50px_rgba(16,185,129,0.12)]">
+        <div className="pointer-events-none absolute left-[18px] right-[18px] top-0 h-[2px] rounded-[999px] bg-[linear-gradient(90deg,rgba(52,211,153,0),rgba(52,211,153,0.55),rgba(226,76,48,0.12),rgba(52,211,153,0))]" />
+        <div className="relative mb-[16px] flex min-h-[46px] flex-col gap-1">
+          <h3 className="font-[var(--font-space-grotesk)] text-[22px] font-extrabold text-[#fff]">
+            Plano gratuito
+          </h3>
+       
+        </div>
+
+        <div className="relative mb-[22px] flex min-h-[100px] flex-col justify-center rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-[18px]">
+          <p className="mb-1 font-['Inter'] text-[11px] font-semibold uppercase tracking-[0.1em] text-[rgba(255,255,255,0.55)]">
+            Sem cartão de crédito
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <span className="font-[var(--font-space-grotesk)] text-[clamp(2.1rem,4vw,2.8rem)] font-black text-[#fff]">
+              R$ 0
+            </span>
+            <span className="pb-1 font-['Inter'] text-[14px] text-[rgba(255,255,255,0.72)]">/ trial</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onStart}
+          className="relative mb-[22px] flex min-h-[54px] w-full items-center justify-center rounded-[14px] border border-[rgba(52,211,153,0.35)] bg-[linear-gradient(180deg,rgba(16,185,129,0.22)_0%,rgba(6,95,70,0.35)_100%)] px-[15px] text-center font-['Inter'] text-[15px] font-bold text-[#fff] transition-all duration-[220ms] ease-in hover:-translate-y-[3px] hover:border-[rgba(52,211,153,0.5)]"
+        >
+          Começar no Gratuito
+        </button>
+
+        <div className="relative mb-[16px] flex items-center gap-[8px]">
+          <span className="h-[8px] w-[8px] rounded-full bg-[#34d399]" />
+          <p className="font-['Inter'] text-[11px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.8)]">
+            O que você recebe
+          </p>
+        </div>
+
+        <ul className="m-0 flex list-none flex-col gap-[10px] p-0">
+          {freeTrialFeatures.map((feature, j) => (
+            <li
+              key={j}
+              className="flex gap-[10px] font-['Inter'] text-[14px] leading-[1.55] text-[rgba(255,255,255,0.88)]"
+            >
+              <span className="mt-[1px] shrink-0 font-black text-[rgba(52,211,153,0.9)]">✓</span>
+              {feature}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  )
 }
 
 function BillingSelector({
@@ -490,6 +560,7 @@ function PlanCard({
 
 export default function Pricing() {
   const [quarterly, setQuarterly] = useState(false)
+  const { openTrialSignup } = useLoginModal()
 
   const biggestSaving = useMemo(() => {
     const values = subscriptionPlans.map((plan) => getPlanMeta(plan).quarterlySavePct)
@@ -531,9 +602,10 @@ export default function Pricing() {
           />
         </motion.div>
 
-        <div className="mx-auto grid max-w-[920px] grid-cols-1 items-stretch gap-[22px] md:grid-cols-2">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-1 items-stretch gap-[22px] md:grid-cols-2 xl:grid-cols-3">
+          <FreeTrialCard onStart={openTrialSignup} index={0} />
           {subscriptionPlans.map((plan, index) => (
-            <PlanCard key={plan.name} plan={plan} quarterly={quarterly} index={index} />
+            <PlanCard key={plan.name} plan={plan} quarterly={quarterly} index={index + 1} />
           ))}
         </div>
 

@@ -33,13 +33,26 @@ export async function GET(req: NextRequest) {
     .map((r) => r.email)
     .filter((e): e is string => typeof e === 'string' && e.length > 0)
 
-  if (emails.length === 0) return new Response('No changes', { status: 200 })
+  if (emails.length > 0) {
+    const { error: upErr } = await supabase
+      .from('profiles')
+      .update({ subscription_status: 'canceled', access_until: null })
+      .in('email', emails)
+    if (upErr) return new Response(`Update error: ${upErr.message}`, { status: 500 })
+  }
 
-  const { error: upErr } = await supabase
+  // Trial por cupom: `trial_access_until` já foi calculado no cadastro (dias do cupom); aqui só compara com agora.
+  const { error: trialErr } = await supabase
     .from('profiles')
-    .update({ subscription_status: 'canceled', access_until: null })
-    .in('email', emails)
-  if (upErr) return new Response(`Update error: ${upErr.message}`, { status: 500 })
+    .update({ subscription_status: 'canceled' })
+    .eq('plan_tier', 'trial')
+    .eq('subscription_status', 'active')
+    .not('trial_access_until', 'is', null)
+    .lt('trial_access_until', now)
+  if (trialErr) return new Response(`Trial expire error: ${trialErr.message}`, { status: 500 })
 
-  return new Response(`Canceled: ${emails.length}`, { status: 200 })
+  return new Response(
+    emails.length > 0 ? `Kiwify canceled: ${emails.length}` : 'No Kiwify cancels; trial pass ok',
+    { status: 200 }
+  )
 }

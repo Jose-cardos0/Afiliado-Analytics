@@ -11,12 +11,17 @@ export default async function DashboardPage() {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('subscription_status')
+    .select('subscription_status, plan_tier, trial_access_until')
     .eq('id', user.id)
     .single()
 
   if (error) redirect('/')
-  if (profile?.subscription_status !== 'active') redirect('/minha-conta/renovar')
+  const trialUntil = profile?.trial_access_until
+    ? new Date(profile.trial_access_until as string).getTime()
+    : 0
+  const trialExpired =
+    profile?.plan_tier === 'trial' && trialUntil > 0 && trialUntil < Date.now()
+  if (profile?.subscription_status !== 'active' || trialExpired) redirect('/minha-conta/renovar')
 
   return <CommissionsPage />
 }

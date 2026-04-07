@@ -1,0 +1,121 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function normalizeCoupon(code: unknown): string {
+  return String(code ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+function normalizeWhatsapp(raw: unknown): string {
+  const d = String(raw ?? "").replace(/\D/g, "");
+  return d;
+}
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase service env ausente");
+  return createClient(url, key);
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const email = String(body?.email ?? "")
+      .trim()
+      .toLowerCase();
+    const password = String(body?.password ?? "");
+    const whatsapp = normalizeWhatsapp(body?.whatsapp);
+    const couponCode = normalizeCoupon(body?.coupon_code);
+
+    if (!email || !email.includes("@")) {
+      return NextResponse.json({ error: "E-mail inválido." }, { status: 400 });
+    }
+    if (password.length < 6) {
+      return NextResponse.json({ error: "Senha deve ter pelo menos 6 caracteres." }, { status: 400 });
+    }
+    if (whatsapp.length < 10 || whatsapp.length > 15) {
+      return NextResponse.json({ error: "Informe um WhatsApp válido (DDD + número)." }, { status: 400 });
+    }
+    if (!couponCode) {
+      return NextResponse.json({ error: "Informe o cupom." }, { status: 400 });
+    }
+
+    const supabase = admin();
+
+    const { data: couponRow, error: cErr } = await supabase
+      .from("trial_coupons")
+      .select("id, duration_days, is_active, max_uses, uses_count")
+      .eq("code", couponCode)
+      .maybeSingle();
+
+    if (cErr || !couponRow) {
+      return NextResponse.json({ error: "Cupom inválido." }, { status: 400 });
+    }
+    if (!couponRow.is_active) {
+      return NextResponse.json({ error: "Este cupom não está ativo." }, { status: 400 });
+    }
+    if ((couponRow.uses_count ?? 0) >= (couponRow.max_uses ?? 0)) {
+      return NextResponse.json({ error: "Cupom esgotado." }, { status: 400 });
+    }
+
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (createErr || !created?.user?.id) {
+      const msg = createErr?.message ?? "";
+      if (/already|registered|exists/i.test(msg)) {
+        return NextResponse.json({ error: "Este e-mail já está cadastrado. Faça login ou use outro e-mail." }, { status: 409 });
+      }
+      return NextResponse.json({ error: createErr?.message ?? "Falha ao criar conta." }, { status: 500 });
+    }
+
+    const userId = created.user.id;
+    const trialUntil = new Date();
+    trialUntil.setUTCDate(trialUntil.getUTCDate() + Number(couponRow.duration_days ?? 1));
+
+    const { error: profErr } = await supabase.from("profiles").insert([
+      {
+        id: userId,
+        email,
+        subscription_status: "active",
+        plan_tier: "trial",
+        plan_name: "Trial gratuito (cupom)",
+        trial_access_until: trialUntil.toISOString(),
+        whatsapp_phone: whatsapp,
+        account_setup_pending: false,
+      },
+    ]);
+
+    if (profErr) {
+      await supabase.auth.admin.deleteUser(userId);
+      return NextResponse.json({ error: profErr.message }, { status: 500 });
+    }
+
+    const { data: incOk, error: incErr } = await supabase.rpc("trial_coupon_increment_use", {
+      p_code: couponCode,
+    });
+
+    if (incErr || incOk !== true) {
+      await supabase.from("profiles").delete().eq("id", userId);
+      await supabase.auth.admin.deleteUser(userId);
+      return NextResponse.json(
+        { error: "Não foi possível aplicar o cupom (tente novamente)." },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      trial_access_until: trialUntil.toISOString(),
+      duration_days: couponRow.duration_days,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Erro no cadastro";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

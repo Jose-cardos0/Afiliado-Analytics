@@ -1,16 +1,19 @@
 'use client'
 
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../../utils/supabase/client'
 import { X, Eye, EyeOff, Download, Smartphone } from 'lucide-react'
 import InfoModal from '@/app/components/ui/InfoModal'
+import { DEFAULT_TRIAL_COUPON_CODE } from '@/lib/trial-coupons-catalog'
+import type { LoginModalMode } from './login-modal-types'
 
 type LoginModalProps = {
   onClose: () => void
+  initialMode?: LoginModalMode
 }
 
-export default function LoginModal({ onClose }: LoginModalProps) {
+export default function LoginModal({ onClose, initialMode = 'login' }: LoginModalProps) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
@@ -22,6 +25,16 @@ export default function LoginModal({ onClose }: LoginModalProps) {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [installHint, setInstallHint] = useState<'standalone' | 'browser' | null>(null)
+  const [panel, setPanel] = useState<LoginModalMode>(initialMode)
+  const [whatsapp, setWhatsapp] = useState('')
+  const [coupon, setCoupon] = useState(DEFAULT_TRIAL_COUPON_CODE)
+
+  useEffect(() => {
+    setPanel(initialMode)
+    if (initialMode === 'trial-signup') {
+      setCoupon(DEFAULT_TRIAL_COUPON_CODE)
+    }
+  }, [initialMode])
 
   const backdropClickStartRef = useRef(false)
   const handleBackdropMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -50,6 +63,44 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 
     onClose()
     router.replace('/dashboard')
+  }
+
+  const handleTrialSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/signup-trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          whatsapp,
+          coupon_code: coupon.trim(),
+        }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        setError(json?.error ?? 'Não foi possível cadastrar.')
+        setSubmitting(false)
+        return
+      }
+      const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (signErr) {
+        setError('Conta criada. Entre com seu e-mail e senha.')
+        setPanel('login')
+        setSubmitting(false)
+        return
+      }
+      onClose()
+      router.replace('/dashboard')
+    } catch {
+      setError('Erro de rede. Tente novamente.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handlePasswordReset = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -190,6 +241,127 @@ export default function LoginModal({ onClose }: LoginModalProps) {
                 </p>
               </div>
             </div>
+          ) : panel === 'trial-signup' ? (
+            <div className="relative z-10">
+              <h2 className="text-center font-[var(--font-space-grotesk)] text-[24px] font-bold tracking-tight text-white">
+                Crie sua conta trial
+              </h2>
+             
+
+              <div className="mt-6">
+                <form onSubmit={handleTrialSignup} className="space-y-4">
+                  <div>
+                    <label htmlFor="trial-email" className="mb-1.5 block font-['Inter'] text-[13px] font-medium text-white/70">
+                      Email
+                    </label>
+                    <input
+                      id="trial-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full rounded-[12px] border border-white/10 bg-black/20 px-4 py-3 font-['Inter'] text-[14px] text-white placeholder-white/30 outline-none transition-all focus:border-[#e24c30]/50 focus:bg-black/30 focus:ring-1 focus:ring-[#e24c30]/50 disabled:opacity-50"
+                      disabled={submitting}
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="trial-password" className="mb-1.5 block font-['Inter'] text-[13px] font-medium text-white/70">
+                      Senha
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="trial-password"
+                        name="password"
+                        type={showPwd ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full rounded-[12px] border border-white/10 bg-black/20 px-4 py-3 pr-12 font-['Inter'] text-[14px] text-white placeholder-white/30 outline-none transition-all focus:border-[#e24c30]/50 focus:bg-black/30 focus:ring-1 focus:ring-[#e24c30]/50 disabled:opacity-50"
+                        disabled={submitting}
+                        placeholder="mín. 6 caracteres"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-white/30 transition-colors hover:text-white"
+                        aria-label={showPwd ? 'Ocultar senha' : 'Mostrar senha'}
+                        disabled={submitting}
+                      >
+                        {showPwd ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="trial-whatsapp" className="mb-1.5 block font-['Inter'] text-[13px] font-medium text-white/70">
+                      WhatsApp (DDD + número)
+                    </label>
+                    <input
+                      id="trial-whatsapp"
+                      name="whatsapp"
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      className="block w-full rounded-[12px] border border-white/10 bg-black/20 px-4 py-3 font-['Inter'] text-[14px] text-white placeholder-white/30 outline-none transition-all focus:border-[#e24c30]/50 focus:bg-black/30 focus:ring-1 focus:ring-[#e24c30]/50 disabled:opacity-50"
+                      disabled={submitting}
+                      placeholder="79999999999"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="trial-coupon" className="mb-1.5 block font-['Inter'] text-[13px] font-medium text-white/70">
+                      Cupom
+                    </label>
+                    <input
+                      id="trial-coupon"
+                      name="coupon"
+                      type="text"
+                      autoComplete="off"
+                      required
+                      value={coupon}
+                      onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+                      className="block w-full rounded-[12px] border border-white/10 bg-black/20 px-4 py-3 font-['Inter'] text-[14px] text-white placeholder-white/30 outline-none transition-all focus:border-[#e24c30]/50 focus:bg-black/30 focus:ring-1 focus:ring-[#e24c30]/50 disabled:opacity-50"
+                      disabled={submitting}
+                      placeholder="1DAYFREE"
+                    />
+                  </div>
+
+                  {error && <p className="text-center font-['Inter'] text-[13px] text-[#ef4444]">{error}</p>}
+
+                  <div className="space-y-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex w-full justify-center rounded-[12px] bg-gradient-to-br from-[#e24c30] to-[#ff7a54] px-4 py-[14px] font-['Inter'] text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(226,76,48,0.25)] transition-all hover:-translate-y-[2px] hover:shadow-[0_12px_32px_rgba(226,76,48,0.4)] disabled:opacity-50 disabled:hover:translate-y-0"
+                    >
+                      {submitting ? 'Cadastrando...' : 'Cadastrar'}
+                    </button>
+                  </div>
+                </form>
+
+                <p className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('login')
+                      setError(null)
+                    }}
+                    className="font-['Inter'] text-[13px] font-medium text-[#fb923c] transition-colors hover:text-[#ff7a54]"
+                    disabled={submitting}
+                  >
+                    Já tenho conta — entrar
+                  </button>
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="relative z-10">
               <h2 className="text-center font-[var(--font-space-grotesk)] text-[24px] font-bold tracking-tight text-white">
@@ -289,6 +461,20 @@ export default function LoginModal({ onClose }: LoginModalProps) {
                     </button>
                   </div>
                 </form>
+
+                <p className="mt-5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('trial-signup')
+                      setError(null)
+                    }}
+                    className="font-['Inter'] text-[13px] font-medium text-white/45 transition-colors hover:text-[#fb923c]"
+                    disabled={submitting}
+                  >
+                    Teste grátis com cupom →
+                  </button>
+                </p>
               </div>
             </div>
           )}

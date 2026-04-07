@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { isTrialBlockedDashboardPath } from "@/lib/trial-dashboard-blocked-paths";
 
 const CAPTURE_HOST = "s.afiliadoanalytics.com.br";
 
@@ -120,17 +121,41 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ✅ Assinatura: bloqueia SOMENTE estas rotas se não estiver "active"
-  if (user && isPaidDashboardPath(pathname)) {
+  // ✅ Assinatura: rotas pagas exigem "active"; trial não acessa módulos bloqueados (GPL, ATI, etc.)
+  const needsSubGate =
+    user &&
+    pathname.startsWith("/dashboard") &&
+    (isPaidDashboardPath(pathname) || isTrialBlockedDashboardPath(pathname));
+
+  if (needsSubGate) {
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("subscription_status, plan_tier, trial_access_until")
       .eq("id", user.id)
       .single();
 
-    if (error || !profile || profile.subscription_status !== "active") {
+    if (error || !profile) {
       const url = req.nextUrl.clone();
       url.pathname = "/minha-conta/renovar";
+      return NextResponse.redirect(url);
+    }
+
+    const trialUntil = profile.trial_access_until
+      ? new Date(profile.trial_access_until as string).getTime()
+      : 0;
+    const trialExpired =
+      profile.plan_tier === "trial" && trialUntil > 0 && trialUntil < Date.now();
+
+    if (trialExpired || profile.subscription_status !== "active") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/minha-conta/renovar";
+      return NextResponse.redirect(url);
+    }
+
+    if (profile.plan_tier === "trial" && isTrialBlockedDashboardPath(pathname)) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/minha-conta/renovar";
+      url.searchParams.set("precisa_plano", "1");
       return NextResponse.redirect(url);
     }
   }

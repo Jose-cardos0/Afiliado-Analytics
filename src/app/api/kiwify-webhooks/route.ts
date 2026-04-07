@@ -118,6 +118,20 @@ async function recomputeProfileStatus(supabase: ReturnType<typeof admin>, email:
 
   const anyValid = validSubs.length > 0
 
+  // Trial ativo sem assinatura Kiwify: não rebaixar nem cancelar até expirar o trial_access_until
+  if (userId && !anyValid) {
+    const { data: profTrial } = await supabase
+      .from("profiles")
+      .select("plan_tier, trial_access_until")
+      .eq("id", userId)
+      .maybeSingle();
+    const until = profTrial?.trial_access_until ? new Date(profTrial.trial_access_until as string).getTime() : 0;
+    if (profTrial?.plan_tier === "trial" && until > Date.now()) {
+      await supabase.from("profiles").update({ subscription_status: "active" }).eq("id", userId);
+      return;
+    }
+  }
+
   const maxAccess =
     planRows
       .map((s) => s.access_until)
@@ -148,6 +162,7 @@ async function recomputeProfileStatus(supabase: ReturnType<typeof admin>, email:
         subscription_status: anyValid ? "active" : "canceled",
         access_until: anyValid ? maxAccess : null,
         plan_tier: planTier,
+        ...(anyValid ? { trial_access_until: null } : {}),
       })
       .eq("id", userId)
   }
