@@ -2,6 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
+import { CAPTURE_CTA_CLASS, CAPTURE_CTA_LABEL } from "./capture-responsive-classes";
 
 interface CTAButtonProps {
   href: string;
@@ -31,8 +32,7 @@ export default function CTAButton({
       href={href}
       rel="nofollow"
       onClick={handleClick}
-      className="cta-pulse w-full sm:w-[420px] inline-flex items-center justify-center gap-2 px-6 py-4 font-extrabold
-                 transition-transform duration-200 ease-out hover:scale-[1.03]"
+      className={`cta-pulse ${CAPTURE_CTA_CLASS} transition-transform duration-200 ease-out hover:scale-[1.02] sm:hover:scale-[1.03]`}
       style={{
         backgroundColor: buttonColor,
         color: "rgb(255, 255, 255)",
@@ -46,7 +46,7 @@ export default function CTAButton({
         <ExternalLink size={20} aria-hidden />
       )}
 
-      {text}
+      <span className={CAPTURE_CTA_LABEL}>{text}</span>
     </a>
   );
 }

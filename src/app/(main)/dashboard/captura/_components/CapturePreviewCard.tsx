@@ -7,6 +7,12 @@ import ScarcityPreview from "./ScarcityPreview";
 import { LayoutVariant } from "../_lib/types";
 import { parseColorToRgb } from "../_lib/captureUtils";
 import CaptureYoutubeEmbed from "@/app/capture/[slug]/CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "@/app/capture/[slug]/capture-responsive-classes";
 
 function isWhatsAppLink(rawUrl: string) {
   const s = (rawUrl || "").trim().toLowerCase();
@@ -87,17 +93,14 @@ export default function CapturePreviewCard(props: {
               )}
 
               {/* 2) Título */}
-              <h1
-                className="text-center font-extrabold leading-tight"
-                style={{ color: "rgb(31, 31, 31)", fontSize: "32px" }}
-              >
+              <h1 className={CAPTURE_TITLE_HERO} style={{ color: "rgb(31, 31, 31)" }}>
                 {safeTitle}
               </h1>
 
               {/* 3) Descrição */}
               <p
-                className="text-center mt-4 leading-snug max-w-sm mx-auto font-semibold"
-                style={{ color: "rgb(60, 60, 60)", fontSize: "17px" }}
+                className={`${CAPTURE_BODY} mt-4 max-w-sm mx-auto font-semibold`}
+                style={{ color: "rgb(60, 60, 60)" }}
               >
                 {safeDesc}
               </p>
@@ -149,7 +152,7 @@ export default function CapturePreviewCard(props: {
               <div className="flex justify-center mt-7 sm:mt-8">
                 <button
                   type="button"
-                  className="w-full sm:w-[420px] inline-flex items-center justify-center gap-2 px-6 py-4 font-extrabold transition-transform duration-200 ease-out hover:scale-[1.01]"
+                  className={`${CAPTURE_CTA_CLASS} font-extrabold transition-transform duration-200 ease-out hover:scale-[1.01]`}
                   style={{
                     backgroundColor: safeColor,
                     color: "rgb(255, 255, 255)",
@@ -163,7 +166,7 @@ export default function CapturePreviewCard(props: {
                     <ExternalLink size={20} aria-hidden />
                   )}
 
-                  {safeButtonText}
+                  <span className={CAPTURE_CTA_LABEL}>{safeButtonText}</span>
                 </button>
               </div>
             </div>

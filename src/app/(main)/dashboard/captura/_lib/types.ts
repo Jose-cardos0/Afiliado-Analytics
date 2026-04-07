@@ -41,4 +41,9 @@ export type CaptureSiteRow = {
   /** URL ou ID do YouTube; opcional — embed acima do 1.º CTA quando preenchido. */
   youtube_url: string | null;
 
+  /** Notificações fictícias (entrada no grupo / cupom); default true. */
+  notifications_enabled: boolean | null;
+  /** `top` = sob o topo da viewport; `bottom` = acima do rodapé. */
+  notifications_position: string | null;
+
 };

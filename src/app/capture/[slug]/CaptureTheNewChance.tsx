@@ -9,6 +9,12 @@ import { parseColorToRgb } from "@/app/(main)/dashboard/captura/_lib/captureUtil
 import { isWhatsAppUrl } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS_UPPER,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const CARD = "#ffffff";
 const TEXT = "#1c1917";
@@ -32,11 +38,11 @@ const SEGMENT_DEG = 360 / SEGMENTS;
 const WIN_CENTER_DEG = (WIN_INDEX + 0.5) * SEGMENT_DEG;
 const FULL_SPINS = 5;
 
-/** Distância do centro aos números (px), ao longo da bisetriz de cada fatia. */
-const LABEL_RADIUS_PX = 80;
-
-/** Tamanho da fonte dos números na roleta (px). */
-const WHEEL_NUMBER_FONT_PX = 20;
+/**
+ * Distância do centro aos números (px), ao longo da bisetriz de cada fatia.
+ * Valor mais baixo evita que o texto ultrapasse a borda em mobile / após scale.
+ */
+const LABEL_RADIUS_PX = 58;
 
 /** Cores por fatia: laranja → amarelo → preto (ciclo). */
 const WHEEL_ORANGE = "#f97316";
@@ -119,14 +125,14 @@ function CtaBlock(props: {
     <>
       <a
         href={ctaHref}
-        className={`newchance-cta-pulse flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-black uppercase tracking-wide text-white no-underline shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99] ${className}`}
+        className={`newchance-cta-pulse ${CAPTURE_CTA_CLASS_UPPER} font-black shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99] ${className}`}
         style={{
           backgroundColor: buttonColor,
           boxShadow: `0 8px 24px rgba(${r},${g},${b},0.35)`,
         }}
       >
         {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-        {safeBtn}
+        <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
       </a>
       <p className="mt-2.5 text-center text-xs font-medium" style={{ color: MUTED }}>
         100% gratuito • Sem spam • Saia quando quiser
@@ -145,7 +151,12 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
     buttonColor,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "The New Chance";
   const safeDesc =
@@ -256,16 +267,18 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
 
   return (
     <>
-      <CaptureVipEntradaToasts variant="coupon" />
+      <CaptureVipEntradaToasts variant="coupon" disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
-          @keyframes newchance-click-pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.06); }
+          /* Pulso só na imagem CLICK (sem translate — evita descentrar no mockup/mobile) */
+          @keyframes newchance-click-img-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
           }
-          .newchance-click-pulse {
-            animation: newchance-click-pulse 1.25s ease-in-out infinite;
+          .newchance-click-img-pulse {
+            transform-origin: center center;
+            animation: newchance-click-img-pulse 1.25s ease-in-out infinite;
             will-change: transform;
           }
           @keyframes newchance-coupon-pulse {
@@ -301,7 +314,7 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
             animation: newchance-marquee 32s linear infinite;
           }
           @media (prefers-reduced-motion: reduce) {
-            .newchance-click-pulse, .newchance-coupon-pulse, .newchance-cta-pulse { animation: none !important; }
+            .newchance-click-img-pulse, .newchance-coupon-pulse, .newchance-cta-pulse { animation: none !important; }
             .newchance-prize-wrap { animation: none !important; opacity: 1; transform: none; }
             .newchance-marquee-inner { animation: none !important; transform: none; }
           }
@@ -362,9 +375,9 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
             </div>
           </div>
 
-          <h1 className="text-center text-[1.35rem] font-extrabold leading-snug sm:text-2xl">{safeTitle}</h1>
+          <h1 className={CAPTURE_TITLE_HERO}>{safeTitle}</h1>
 
-          <p className="text-center text-[0.95rem] leading-relaxed" style={{ color: MUTED }}>
+          <p className={CAPTURE_BODY} style={{ color: MUTED }}>
             {safeDesc}
           </p>
 
@@ -374,11 +387,11 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
             </div>
           ) : null}
 
-          {/* Roleta ou prêmio */}
-          <div className="relative py-2">
+          {/* Roleta ou prêmio — sem scale no wrapper (evita cortar o CLICK com overflow-x-hidden no preview/mobile) */}
+          <div className="relative overflow-x-visible py-2 px-0.5 sm:px-0">
             {wheelVisible ? (
               <div
-                className="relative mx-auto w-[min(100%,280px)]"
+                className="relative mx-auto w-full max-w-[min(100%,218px)] sm:max-w-[min(100%,292px)]"
                 style={{
                   opacity: phase === "won" ? 0 : 1,
                   transition: "opacity 0.45s ease",
@@ -401,12 +414,16 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
                   </svg>
                 </div>
 
-                <div
-                  className="relative mx-auto aspect-square w-full max-w-[308px] rounded-full"
+                <button
+                  type="button"
+                  onClick={spin}
+                  disabled={phase !== "idle"}
+                  className="relative mx-auto flex aspect-square w-full max-w-[min(100%,218px)] cursor-pointer flex-col items-center justify-center overflow-visible rounded-full border-0 bg-transparent p-0 shadow-none outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed sm:max-w-[308px]"
                   style={{ filter: WHEEL_ORANGE_GLOW }}
+                  aria-label="Girar a roleta"
                 >
                   <div
-                    className="absolute inset-0 rounded-full p-[5px]"
+                    className="pointer-events-none absolute inset-0 rounded-full p-[5px]"
                     style={{
                       background: "linear-gradient(145deg, #fef08a 0%, #f97316 38%, #ea580c 72%, #fbbf24 100%)",
                       boxShadow:
@@ -426,7 +443,7 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
                       }}
                     >
                       <div
-                        className="absolute left-1/2 top-1/2 z-[5] h-[3.25rem] w-[3.25rem] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-amber-100 bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 shadow-[0_4px_14px_rgba(0,0,0,0.3),inset_0_2px_6px_rgba(255,255,255,0.45)]"
+                        className="absolute left-1/2 top-1/2 z-[5] h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-amber-100 bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 shadow-[0_4px_14px_rgba(0,0,0,0.3),inset_0_2px_6px_rgba(255,255,255,0.45)] sm:h-[3.25rem] sm:w-[3.25rem]"
                         aria-hidden
                       />
                       {WHEEL_LABELS.map((label, i) => {
@@ -435,10 +452,9 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
                         return (
                           <span
                             key={i}
-                            className={labelTextClass(i)}
+                            className={`${labelTextClass(i)} text-[clamp(9px,2.9vw,18px)] sm:text-[clamp(11px,3.4vw,20px)]`}
                             style={{
                               transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${r}px) rotate(90deg)`,
-                              fontSize: `${WHEEL_NUMBER_FONT_PX}px`,
                             }}
                           >
                             {label}
@@ -449,23 +465,20 @@ export default function CaptureTheNewChance(props: CaptureVipLandingProps) {
                   </div>
 
                   {phase === "idle" ? (
-                    <button
-                      type="button"
-                      onClick={spin}
-                      className="newchance-click-pulse absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                      aria-label="Girar a roleta"
-                    >
-                      <Image
-                        src={CLICK_IMG}
-                        alt=""
-                        width={200}
-                        height={88}
-                        className="h-auto w-[min(200px,72vw)] max-w-[220px] object-contain drop-shadow-lg"
-                        priority
-                      />
-                    </button>
+                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-[4%]">
+                      <div className="newchance-click-img-pulse w-[min(216px,100%)] max-w-[236px] sm:w-[min(264px,100%)] sm:max-w-[280px]">
+                        <Image
+                          src={CLICK_IMG}
+                          alt=""
+                          width={200}
+                          height={88}
+                          className="h-auto w-full object-contain object-center drop-shadow-lg"
+                          priority
+                        />
+                      </div>
+                    </div>
                   ) : null}
-                </div>
+                </button>
 
                 <p className="mt-4 text-center text-xs font-semibold" style={{ color: MUTED }}>
                   Toque em{" "}

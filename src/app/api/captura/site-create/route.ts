@@ -4,6 +4,10 @@ import { createClient as createServerSupabase } from "../../../../../utils/supab
 import { getEntitlementsForUser, getUsageSnapshot } from "@/lib/plan-server";
 import { normalizeCapturePageTemplate } from "@/lib/capture-page-template";
 import { isValidOptionalYoutubeUrl } from "@/lib/youtube-embed";
+import {
+  normalizeNotificationsEnabled,
+  normalizeNotificationsPosition,
+} from "@/lib/capture-notifications";
 
 /** INSERT com service role evita RLS/policies que às vezes ignoram colunas novas (ex.: page_template). */
 function supabaseServiceRole() {
@@ -109,6 +113,12 @@ export async function POST(req: Request) {
     meta_pixel_id: trimOrNull(body.meta_pixel_id ?? body.metaPixelId),
     page_template,
     youtube_url: youtubeRaw ? youtubeRaw : null,
+    notifications_enabled: normalizeNotificationsEnabled(
+      body.notifications_enabled ?? body.notificationsEnabled,
+    ),
+    notifications_position: normalizeNotificationsPosition(
+      body.notifications_position ?? body.notificationsPosition,
+    ),
     userid: user.id,
   };
 

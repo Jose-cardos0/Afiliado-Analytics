@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Clock, Shield, Star } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
@@ -8,6 +8,12 @@ import type { CaptureVipLandingProps } from "./capture-vip-types";
 import { isWhatsAppUrl, useCaptureVipFonts } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const TERROSO_BENEFITS: { emoji: string; title: string; body: string }[] = [
   {
@@ -61,7 +67,12 @@ export default function CaptureVipTerroso(props: CaptureVipLandingProps) {
     logoUrl,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "Grupo VIP";
   const safeDesc =
@@ -74,22 +85,31 @@ export default function CaptureVipTerroso(props: CaptureVipLandingProps) {
   const yt = (youtubeUrl ?? "").trim();
 
   const [spotsLeft, setSpotsLeft] = useState(42);
+  const [spotsPulse, setSpotsPulse] = useState(false);
+  const prevSpotsRef = useRef(42);
 
   useCaptureVipFonts();
 
   useEffect(() => {
-    if (previewMode) return;
     const t = setInterval(() => {
       setSpotsLeft((s) => (s > MIN_SPOTS ? s - 1 : 42));
     }, 3000);
     return () => clearInterval(t);
-  }, [previewMode]);
+  }, []);
 
-  const displaySpots = previewMode ? 18 : spotsLeft;
+  useEffect(() => {
+    if (spotsLeft < prevSpotsRef.current) {
+      setSpotsPulse(true);
+      const id = window.setTimeout(() => setSpotsPulse(false), 700);
+      prevSpotsRef.current = spotsLeft;
+      return () => window.clearTimeout(id);
+    }
+    prevSpotsRef.current = spotsLeft;
+  }, [spotsLeft]);
 
   return (
     <>
-      <CaptureVipEntradaToasts />
+      <CaptureVipEntradaToasts disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -102,8 +122,34 @@ export default function CaptureVipTerroso(props: CaptureVipLandingProps) {
             animation: capture-vip-terroso-cta-pulse 1.6s ease-in-out infinite;
             will-change: transform;
           }
+          @keyframes capture-vip-terroso-spots-down {
+            0% { color: rgb(160, 117, 90); transform: scale(1); }
+            45% { color: rgb(220, 38, 38); transform: scale(1.12); }
+            100% { color: rgb(160, 117, 90); transform: scale(1); }
+          }
+          .capture-vip-terroso-spots-value {
+            color: rgb(160, 117, 90);
+          }
+          .capture-vip-terroso-spots-down {
+            animation: capture-vip-terroso-spots-down 0.65s ease-out 1 both;
+          }
+          @keyframes capture-vip-terroso-hourglass-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          .capture-vip-terroso-hourglass {
+            display: inline-block;
+            transform-origin: 50% 55%;
+            animation: capture-vip-terroso-hourglass-spin 12s linear infinite;
+          }
           @media (prefers-reduced-motion: reduce) {
             .capture-vip-terroso-cta-pulse { animation: none !important; }
+            .capture-vip-terroso-hourglass { animation: none !important; }
+            .capture-vip-terroso-spots-down {
+              animation: none !important;
+              color: rgb(220, 38, 38) !important;
+              transition: color 0.2s ease;
+            }
           }
         `,
         }}
@@ -151,11 +197,11 @@ export default function CaptureVipTerroso(props: CaptureVipLandingProps) {
             </div>
           </div>
 
-          <h1 className="text-center text-xl font-bold leading-tight" style={{ color: TERROSO.text }}>
+          <h1 className={`${CAPTURE_TITLE_HERO} font-bold`} style={{ color: TERROSO.text }}>
             {safeTitle}
           </h1>
 
-          <p className="text-center text-sm font-medium" style={{ color: TERROSO.textMuted }}>
+          <p className={`${CAPTURE_BODY} font-medium`} style={{ color: TERROSO.textMuted }}>
             {safeDesc}
           </p>
 
@@ -168,32 +214,39 @@ export default function CaptureVipTerroso(props: CaptureVipLandingProps) {
           <div className="w-full">
             <a
               href={ctaHref}
-              className="capture-vip-terroso-cta-pulse flex w-full items-center justify-center rounded-2xl py-4 text-lg font-extrabold tracking-wide text-white no-underline transition-opacity hover:opacity-95 active:opacity-90"
+              className={`capture-vip-terroso-cta-pulse ${CAPTURE_CTA_CLASS} text-lg font-extrabold tracking-wide transition-opacity hover:opacity-95 active:opacity-90`}
               style={{
                 background: `linear-gradient(135deg, ${TERROSO.ctaFrom} 0%, ${TERROSO.ctaTo} 100%)`,
                 boxShadow: TERROSO.ctaShadow,
               }}
             >
-              {showWa ? <FaWhatsapp className="mr-2.5 text-xl" aria-hidden /> : null}
-              {safeBtn.toUpperCase()}
+              {showWa ? <FaWhatsapp className="text-xl shrink-0" aria-hidden /> : null}
+              <span className={CAPTURE_CTA_LABEL}>{safeBtn.toUpperCase()}</span>
             </a>
           </div>
 
           <div
-            className="flex items-center gap-2 rounded-xl border px-5 py-3 text-base font-semibold"
+            className="flex w-full flex-col items-center rounded-xl border px-4 py-3.5 text-center sm:px-5 sm:py-3.5"
             style={{
               background: "rgb(255, 255, 255)",
               borderColor: TERROSO.scarcityBorder,
               color: TERROSO.text,
             }}
           >
-            <Clock className="h-5 w-5 shrink-0" style={{ color: TERROSO.accent }} aria-hidden />
-            <span>
-              ⏳ Vagas restantes:{" "}
-              <span className="text-2xl font-extrabold" style={{ color: TERROSO.accent }}>
-                {displaySpots}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+              <Clock className="h-5 w-5 shrink-0" style={{ color: TERROSO.accent }} aria-hidden />
+              <span className="capture-vip-terroso-hourglass text-[1.125rem] leading-none" aria-hidden>
+                ⏳
               </span>
-            </span>
+              <span className="text-[13px] font-semibold leading-snug sm:text-[15px]">Vagas restantes</span>
+            </div>
+            <p
+              className={`capture-vip-terroso-spots-value mt-2.5 w-full text-center text-[clamp(1.85rem,9vw,2.35rem)] font-extrabold tabular-nums leading-none tracking-tight sm:mt-2 sm:text-[clamp(1.75rem,5vw,2.1rem)] ${
+                spotsPulse ? "capture-vip-terroso-spots-down" : ""
+              }`}
+            >
+              {spotsLeft}
+            </p>
           </div>
 
           <div className="mt-2 w-full space-y-3">

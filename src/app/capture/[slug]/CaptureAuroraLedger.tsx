@@ -10,6 +10,12 @@ import { parseColorToRgb } from "@/app/(main)/dashboard/captura/_lib/captureUtil
 import { isWhatsAppUrl } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS_UPPER,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const ACCENT = "#5eead4";
 const AMBER = "#fbbf24";
@@ -61,7 +67,7 @@ function OfertCarousel() {
 
   return (
     <div
-      className="mt-5 w-full"
+      className="mt-5 w-[calc(100%+3rem)] max-w-[calc(100%+3rem)] -mx-6 sm:mx-0 sm:w-full sm:max-w-none"
       role="region"
       aria-roledescription="carousel"
       aria-label="Ofertas em destaque"
@@ -92,15 +98,15 @@ function OfertCarousel() {
           {OFERT_SLIDES.map((slide, slideIndex) => (
             <div
               key={slide.src}
-              className="relative aspect-[4/3] w-full min-w-full shrink-0"
+              className="relative aspect-[4/3] w-full min-w-full shrink-0 max-sm:aspect-[3/4]"
               aria-hidden={OFERT_SLIDES[index]?.src !== slide.src}
             >
               <Image
                 src={slide.src}
                 alt={slide.alt}
                 fill
-                className="object-contain p-3 sm:p-4"
-                sizes="(max-width: 448px) 100vw, 400px"
+                className="object-contain object-center p-0 sm:p-4"
+                sizes="(max-width: 768px) 100vw, 448px"
                 unoptimized
                 priority={slideIndex === 0}
               />
@@ -182,7 +188,7 @@ function CtaButton(props: {
   return (
     <a
       href={href}
-      className={`capture-aurora-cta relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-5 py-4 text-base font-black uppercase tracking-[0.12em] text-white no-underline transition-transform hover:scale-[1.02] active:scale-[0.98] ${className}`}
+      className={`capture-aurora-cta relative ${CAPTURE_CTA_CLASS_UPPER} overflow-hidden font-black tracking-[0.12em] transition-transform hover:scale-[1.02] active:scale-[0.98] ${className}`}
       style={{
         backgroundColor: `rgb(${r},${g},${b})`,
         boxShadow: `0 12px 40px rgba(${r},${g},${b},0.38)`,
@@ -196,7 +202,9 @@ function CtaButton(props: {
         }}
         aria-hidden
       />
-      {children}
+      <span className="relative z-[1] flex min-w-0 w-full items-center justify-center gap-2 px-1">
+        {children}
+      </span>
     </a>
   );
 }
@@ -211,7 +219,12 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
     buttonColor,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "O grupo que o feed esconde.";
   const safeDesc =
@@ -226,7 +239,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
 
   return (
     <>
-      <CaptureVipEntradaToasts />
+      <CaptureVipEntradaToasts disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -312,7 +325,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
 
           {/* Cartão principal */}
           <article
-            className="rounded-[1.75rem] border border-white/[0.09] bg-white/[0.05] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-8"
+            className="rounded-[1.75rem] border border-white/[0.09] bg-white/[0.05] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-3"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 80px rgba(0,0,0,0.45)" }}
           >
             {logoUrl ? (
@@ -324,7 +337,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
             ) : null}
 
             <h1
-              className="text-center text-[1.65rem] font-black leading-[1.12] tracking-tight text-white sm:text-4xl"
+              className={`${CAPTURE_TITLE_HERO} font-black text-white sm:text-4xl`}
               style={{ fontFamily: "var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif" }}
             >
               {safeTitle}
@@ -335,7 +348,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
             <div className="mt-6">
               <CtaButton href={ctaHref} r={r} g={g} b={b}>
                 {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-                {safeBtn}
+                <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
               </CtaButton>
               <p className="mt-3 text-center text-xs text-zinc-500">
                 Depois do toque, confirme em <span className="font-semibold text-zinc-400">Continuar</span> no
@@ -343,7 +356,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
               </p>
             </div>
 
-            <p className="mt-6 text-center text-[15px] leading-relaxed text-zinc-400 sm:text-base">{safeDesc}</p>
+            <p className={`mt-6 ${CAPTURE_BODY} text-zinc-400 sm:text-base`}>{safeDesc}</p>
 
             {/* Gatilho editorial (copy fixa do template) */}
             <p
@@ -421,7 +434,7 @@ export default function CaptureAuroraLedger(props: CaptureVipLandingProps) {
             <div className="mt-8">
               <CtaButton href={ctaHref} r={r} g={g} b={b}>
                 {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-                {safeBtn}
+                <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
               </CtaButton>
               <p className="mt-3 text-center text-xs text-zinc-500">
                 Depois do toque, confirme em <span className="font-semibold text-zinc-400">Continuar</span> no

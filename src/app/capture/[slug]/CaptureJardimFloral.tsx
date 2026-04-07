@@ -8,6 +8,12 @@ import { parseColorToRgb } from "@/app/(main)/dashboard/captura/_lib/captureUtil
 import { isWhatsAppUrl } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const ROSE_DARK = "#9f1239";
 const ROSE_DEEP = "#831843";
@@ -69,7 +75,12 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
     buttonColor,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "Um cantinho só seu no grupo";
   const safeDesc =
@@ -84,7 +95,7 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
 
   return (
     <>
-      <CaptureVipEntradaToasts />
+      <CaptureVipEntradaToasts disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -138,7 +149,7 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
           }
           .jardim-floral-surface::before {
             content: "";
-            position: fixed;
+            position: ${previewMode ? "absolute" : "fixed"};
             inset: 0;
             z-index: 0;
             pointer-events: none;
@@ -161,14 +172,17 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
       />
 
       <div
-        className="jardim-floral-surface min-h-screen overflow-x-hidden px-4 pb-14 pt-10 sm:pt-14"
+        className={`jardim-floral-surface ${previewMode ? "min-h-full" : "min-h-screen"} overflow-x-hidden px-4 pb-14 pt-10 sm:pt-14`}
         style={{
           fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple Color Emoji", sans-serif',
           color: ROSE_DEEP,
         }}
       >
-        {/* Decoração SVG por cima do véu (foto já traz flores) */}
-        <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden" aria-hidden>
+        {/* No preview do dashboard: absolute (não fixed), senão o véu e as flores ancoram à viewport e “somem” do mockup). */}
+        <div
+          className={`pointer-events-none inset-0 z-[1] overflow-hidden ${previewMode ? "absolute" : "fixed"}`}
+          aria-hidden
+        >
           <div
             className="absolute -right-16 top-24 h-72 w-72 rounded-full opacity-[0.18] blur-3xl md:opacity-[0.12]"
             style={{ background: `radial-gradient(circle, ${ROSE_SOFT} 0%, transparent 70%)` }}
@@ -194,7 +208,7 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
             }}
           >
             <div
-              className="rounded-[1.85rem] px-5 py-8 sm:px-8 sm:py-10"
+              className="rounded-[1.85rem] px-5 py-1 sm:px-3 sm:py-4"
               style={{
                 background: `linear-gradient(180deg, rgba(255,255,255,0.97) 0%, ${ROSE_MIST} 100%)`,
               }}
@@ -232,7 +246,7 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
               ) : null}
 
               <h1
-                className="mt-6 text-center text-[1.55rem] font-extrabold leading-tight tracking-tight sm:text-3xl"
+                className={`mt-6 ${CAPTURE_TITLE_HERO}`}
                 style={{ color: ROSE_DEEP }}
               >
                 {safeTitle}
@@ -254,7 +268,7 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
               </div>
 
               <p
-                className="mt-5 text-center text-[15px] leading-relaxed sm:text-base"
+                className={`mt-5 ${CAPTURE_BODY}`}
                 style={{ color: `${ROSE_DEEP}`, opacity: 0.82 }}
               >
                 {safeDesc}
@@ -263,13 +277,13 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
               <div className="mt-7 flex w-full flex-col items-stretch">
                 <a
                   href={ctaHref}
-                  className="jardim-cta-pulse flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-bold text-white no-underline transition-transform active:scale-[0.98]"
+                  className={`jardim-cta-pulse ${CAPTURE_CTA_CLASS} rounded-full font-bold transition-transform active:scale-[0.98]`}
                   style={{
                     backgroundColor: `rgb(${r},${g},${b})`,
                   }}
                 >
                   {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-                  {safeBtn}
+                  <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
                 </a>
                 <p
                   className="mt-4 w-full text-center text-[13px] font-medium leading-relaxed"
@@ -301,14 +315,14 @@ export default function CaptureJardimFloral(props: CaptureVipLandingProps) {
               <div className="mt-8 flex w-full flex-col items-stretch">
                 <a
                   href={ctaHref}
-                  className="jardim-cta-pulse flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-bold text-white no-underline transition-transform active:scale-[0.98]"
+                  className={`jardim-cta-pulse ${CAPTURE_CTA_CLASS} rounded-full font-bold transition-transform active:scale-[0.98]`}
                   style={{
                     backgroundColor: `rgb(${r},${g},${b})`,
                     animationDelay: "0.35s",
                   }}
                 >
                   {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-                  {safeBtn}
+                  <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
                 </a>
               </div>
 

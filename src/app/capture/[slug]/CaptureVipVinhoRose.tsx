@@ -8,6 +8,12 @@ import { parseColorToRgb } from "@/app/(main)/dashboard/captura/_lib/captureUtil
 import { isWhatsAppUrl } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS_UPPER,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const BG = "#FFF5F7";
 const CARD = "#ffffff";
@@ -44,14 +50,14 @@ function CtaBlock(props: {
     <>
       <a
         href={ctaHref}
-        className="capture-vinho-rose-cta-pulse flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-black uppercase tracking-wide text-white no-underline shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
+        className={`capture-vinho-rose-cta-pulse ${CAPTURE_CTA_CLASS_UPPER} font-black shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]`}
         style={{
           backgroundColor: buttonColor,
           boxShadow: `0 8px 24px rgba(${r},${g},${b},0.35)`,
         }}
       >
         {showWa ? <FaWhatsapp className="text-2xl shrink-0" aria-hidden /> : null}
-        {safeBtn}
+        <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
       </a>
       <p className="mt-2.5 text-center text-xs font-medium" style={{ color: MUTED }}>
         100% gratuito • Sem spam • Saia quando quiser
@@ -70,7 +76,12 @@ export default function CaptureVipVinhoRose(props: CaptureVipLandingProps) {
     buttonColor,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "Grupo VIP";
   const safeDesc =
@@ -86,7 +97,7 @@ export default function CaptureVipVinhoRose(props: CaptureVipLandingProps) {
 
   return (
     <>
-      <CaptureVipEntradaToasts />
+      <CaptureVipEntradaToasts disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -135,9 +146,9 @@ export default function CaptureVipVinhoRose(props: CaptureVipLandingProps) {
             </div>
           </div>
 
-          <h1 className="text-center text-[1.35rem] font-extrabold leading-snug sm:text-2xl">{safeTitle}</h1>
+          <h1 className={CAPTURE_TITLE_HERO}>{safeTitle}</h1>
 
-          <p className="text-center text-[0.95rem] leading-relaxed" style={{ color: MUTED }}>
+          <p className={CAPTURE_BODY} style={{ color: MUTED }}>
             {safeDesc}
           </p>
 

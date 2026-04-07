@@ -42,6 +42,8 @@ type NavItem = {
   proOnly?: boolean;
   /** Obrigatório quando `proOnly`: usado para cadeado/estilo, espelha o backend */
   proFeature?: ProSidebarFeature;
+  /** Não mostrar na sidebar (rota continua acessível por URL direta). */
+  hidden?: boolean;
 };
 
 const sidebarNavItems: NavItem[] = [
@@ -110,6 +112,7 @@ const sidebarNavItems: NavItem[] = [
     title: "Lista de Ofertas - ML",
     href: "/dashboard/minha-lista-ofertas-ml",
     icon: <ListChecks className="h-5 w-5 text-amber-400" />,
+    hidden: true,
   },
   {
     title: "Gerador de Criativos",
@@ -146,7 +149,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const { entitlements } = usePlanEntitlements();
 
   const visibleItems = useMemo(() => {
-    return sidebarNavItems.map((item) => {
+    return sidebarNavItems.filter((item) => !item.hidden).map((item) => {
       const feature = item.proFeature;
       const hasFeature =
         feature && entitlements ? Boolean(entitlements[feature]) : false;

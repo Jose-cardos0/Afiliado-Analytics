@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  DEFAULT_NOTIFICATIONS_POSITION,
+  type NotificationsPosition,
+} from "@/lib/capture-notifications";
+import { useCapturePreviewPortal } from "./CapturePreviewPortalContext";
 
 /** Homens: só números, h1.webp, Jordan. */
 const NOTIFI_MALE = [
@@ -144,6 +150,8 @@ export type CaptureVipEntradaToastsProps = {
    * `coupon` — só The New Chance: cupom X% Off.
    */
   variant?: "default" | "coupon";
+  /** Onde o cartão aparece (viewport ou área do preview no dashboard). */
+  position?: NotificationsPosition;
 };
 
 type ToastData = {
@@ -155,16 +163,64 @@ type ToastData = {
 
 type Phase = "enter" | "visible" | "exit";
 
+function toastPositionLayerClasses(
+  position: NotificationsPosition,
+  dock: "preview" | "viewport",
+): string {
+  const mode = dock === "viewport" ? "fixed" : "absolute";
+  const z = dock === "viewport" ? "z-[1002]" : "z-[10]";
+  const base = `pointer-events-none ${mode} ${z}`;
+  const topSafe =
+    dock === "viewport"
+      ? "top-[max(4.5rem,calc(env(safe-area-inset-top)+2.75rem))]"
+      : "top-12 sm:top-14";
+  const bottomPad =
+    dock === "viewport"
+      ? "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      : "pb-2";
+
+  switch (position) {
+    case "top_left":
+      return `${base} inset-x-0 ${topSafe} flex max-w-full justify-start overflow-x-hidden pl-3 pt-1 sm:pl-4`;
+    case "top_center":
+      return `${base} inset-x-0 ${topSafe} flex max-w-full justify-center overflow-x-hidden px-3 pt-1`;
+    case "top_right":
+      return `${base} inset-x-0 ${topSafe} flex max-w-full justify-end overflow-x-hidden pr-3 pt-1 sm:pr-4`;
+    case "bottom_left":
+      return `${base} inset-x-0 bottom-0 flex max-w-full justify-start overflow-x-hidden pl-3 pt-2 ${bottomPad} sm:pl-4`;
+    case "bottom_center":
+      return `${base} inset-x-0 bottom-0 flex max-w-full justify-center overflow-x-hidden px-3 pt-2 ${bottomPad}`;
+    case "bottom_right":
+      return `${base} inset-x-0 bottom-0 flex max-w-full justify-end overflow-x-hidden pl-3 pt-2 pr-3 sm:pr-4 ${bottomPad}`;
+    case "center":
+      return `${base} inset-0 flex max-w-full items-center justify-center overflow-x-hidden p-3`;
+    case "middle_left":
+      return `${base} left-0 top-1/2 max-w-full -translate-y-1/2 flex justify-start overflow-x-hidden pl-3 sm:pl-4`;
+    case "middle_right":
+      return `${base} right-0 top-1/2 max-w-full -translate-y-1/2 flex justify-end overflow-x-hidden pr-3 sm:pr-4`;
+    default:
+      return `${base} inset-x-0 ${topSafe} flex max-w-full justify-end overflow-x-hidden pr-3 pt-1 sm:pr-4`;
+  }
+}
+
 /**
  * Uma notificação de cada vez: entra da direita, fica 5s, desaparece com fade (sem sair pela esquerda), pausa 2s.
  */
 export default function CaptureVipEntradaToasts({
   disabled = false,
   variant = "default",
+  position = DEFAULT_NOTIFICATIONS_POSITION,
 }: CaptureVipEntradaToastsProps) {
   const [toast, setToast] = useState<ToastData | null>(null);
   const [phase, setPhase] = useState<Phase | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
   const idRef = useRef(0);
+  const previewPortal = useCapturePreviewPortal();
+
+  /** Página pública: portal para `body`. Dashboard (preview): espera overlay e porta para lá — nunca para o body inteiro. */
+  useLayoutEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (disabled) return;
@@ -218,7 +274,21 @@ export default function CaptureVipEntradaToasts({
 
   if (disabled) return null;
 
-  return (
+  if (!portalReady || typeof document === "undefined") {
+    return null;
+  }
+
+  if (previewPortal !== undefined && previewPortal.root === null) {
+    return null;
+  }
+
+  const portalTarget =
+    previewPortal !== undefined && previewPortal.root !== null
+      ? previewPortal.root
+      : document.body;
+  const dockInPreviewCard = previewPortal !== undefined && previewPortal.root !== null;
+
+  return createPortal(
     <>
       <style
         dangerouslySetInnerHTML={{
@@ -265,7 +335,10 @@ export default function CaptureVipEntradaToasts({
         }}
       />
       <div
-        className="pointer-events-none fixed inset-x-0 top-[3.25rem] z-[1002] flex max-w-full justify-end overflow-x-hidden pr-3 sm:pr-4"
+        className={toastPositionLayerClasses(
+          position,
+          dockInPreviewCard ? "preview" : "viewport",
+        )}
         aria-live="polite"
         aria-atomic="true"
       >
@@ -306,6 +379,7 @@ export default function CaptureVipEntradaToasts({
           </div>
         ) : null}
       </div>
-    </>
+    </>,
+    portalTarget,
   );
 }

@@ -27,11 +27,18 @@ import { usePlanEntitlements } from "../PlanEntitlementsContext";
 import type { CaptureSiteRow, LayoutVariant, PageTemplate } from "./_lib/types";
 import { PAGE_TEMPLATE_OPTIONS, pageTemplateLabel } from "./_lib/captureTemplates";
 import { normalizeCapturePageTemplate } from "@/lib/capture-page-template";
+import {
+  DEFAULT_NOTIFICATIONS_POSITION,
+  normalizeNotificationsPosition,
+  NOTIFICATIONS_POSITION_OPTIONS,
+  type NotificationsPosition,
+} from "@/lib/capture-notifications";
 import { isValidOptionalYoutubeUrl } from "@/lib/youtube-embed";
 import { formatDateTimePtBR, isExpired, sanitizeSlug } from "./_lib/captureUtils";
 
 import CapturePreviewCard from "./_components/CapturePreviewCard";
 import CaptureVipLanding from "@/app/capture/[slug]/CaptureVipLanding";
+import { CapturePreviewPortalContext } from "@/app/capture/[slug]/CapturePreviewPortalContext";
 import DeleteSiteModal from "./_components/DeleteSiteModal";
 import LayoutVariantField from "./_components/LayoutVariantField";
 import ResetMetricsModal from "./_components/ResetMetricsModal";
@@ -39,6 +46,18 @@ import ResetMetricsModal from "./_components/ResetMetricsModal";
 const DOMAIN = "s.afiliadoanalytics.com.br";
 const LOGO_BUCKET = "capture-logos";
 const PRO_CAPTURE_CHECKOUT_URL = "https://pay.kiwify.com.br/y7I4SuT";
+
+/** `public/celularmockup.png` (957×1949) — área útil da tela em % do retângulo do mockup. */
+const VIP_PREVIEW_MOCKUP = {
+  src: "/celularmockup.png",
+  w: 957,
+  h: 1949,
+  /**
+   * Insets calibrados para o recorte coincidir com o buraco transparente (menos faixa preta).
+   * top/bottom menores = conteúdo ocupa mais em altura; lados menores = mais largura.
+   */
+  screen: { top: "5.65%", left: "4.55%", right: "4.55%", bottom: "6.05%" },
+} as const;
 
 const DEFAULT_BUTTON_TEXT = "Acessar Grupo Vip";
 
@@ -164,6 +183,12 @@ export default function CapturaClient() {
   const [buttonColor, setButtonColor] = useState("#25D366");
   const [metaPixelId, setMetaPixelId] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsPosition, setNotificationsPosition] =
+    useState<NotificationsPosition>(DEFAULT_NOTIFICATIONS_POSITION);
+  /** Overlay onde o toast VIP é portado no preview (não cobre o resto do dashboard). */
+  const [vipPreviewToastRoot, setVipPreviewToastRoot] = useState<HTMLDivElement | null>(null);
 
   // layout variant (icons | scarcity) — só página classic
   const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>("icons");
@@ -363,6 +388,9 @@ export default function CapturaClient() {
     setMetaPixelId("");
     setYoutubeUrl("");
 
+    setNotificationsEnabled(true);
+    setNotificationsPosition(DEFAULT_NOTIFICATIONS_POSITION);
+
     setLogoFile(null);
     setLogoPendingAction("keep");
     setLogoToast(null);
@@ -387,6 +415,9 @@ export default function CapturaClient() {
     setPageTemplate(((row as CaptureSiteRow).page_template ?? "classic") as PageTemplate);
     setMetaPixelId(row.meta_pixel_id ?? "");
     setYoutubeUrl(row.youtube_url ?? "");
+
+    setNotificationsEnabled(row.notifications_enabled !== false);
+    setNotificationsPosition(normalizeNotificationsPosition(row.notifications_position));
 
     setLogoFile(null);
     setLogoPendingAction("keep");
@@ -419,6 +450,8 @@ export default function CapturaClient() {
       setPageTemplate(((site as CaptureSiteRow).page_template ?? "classic") as PageTemplate);
       setMetaPixelId(site.meta_pixel_id ?? "");
       setYoutubeUrl(site.youtube_url ?? "");
+      setNotificationsEnabled(site.notifications_enabled !== false);
+      setNotificationsPosition(normalizeNotificationsPosition(site.notifications_position));
 
       originalButtonUrlRef.current = (site.whatsapp_url ?? "").trim();
 
@@ -434,6 +467,8 @@ export default function CapturaClient() {
       setLogoUrl(null);
       setMetaPixelId("");
       setYoutubeUrl("");
+      setNotificationsEnabled(true);
+      setNotificationsPosition(DEFAULT_NOTIFICATIONS_POSITION);
     } else {
       originalButtonUrlRef.current = "";
       modeRef.current = "empty";
@@ -441,6 +476,8 @@ export default function CapturaClient() {
       setLogoUrl(null);
       setMetaPixelId("");
       setYoutubeUrl("");
+      setNotificationsEnabled(true);
+      setNotificationsPosition(DEFAULT_NOTIFICATIONS_POSITION);
     }
   }
 
@@ -482,6 +519,13 @@ export default function CapturaClient() {
     if (step === 3) return setStep(2);
     if (step === 2) return setStep(1);
     setStep(1);
+  }
+
+  /** No passo 1 da criação: volta à escolha do modelo de página. */
+  function backToTemplatePicker() {
+    setError(null);
+    modeRef.current = "pickTemplate";
+    setMode("pickTemplate");
   }
 
   function validateLogoFileOrThrow(f: File) {
@@ -593,6 +637,8 @@ export default function CapturaClient() {
         meta_pixel_id: metaPixelId.trim() || null,
         page_template: pageTemplateRef.current,
         youtube_url: youtubeUrl.trim() || null,
+        notifications_enabled: notificationsEnabled,
+        notifications_position: notificationsPosition,
       }),
     });
     const created = (await res.json()) as { id?: string; error?: string; page_template?: unknown };
@@ -693,6 +739,8 @@ export default function CapturaClient() {
         meta_pixel_id: metaPixelId.trim() || null,
         page_template: wantedTpl,
         youtube_url: youtubeUrl.trim() || null,
+        notifications_enabled: notificationsEnabled,
+        notifications_position: notificationsPosition,
         updated_at: new Date().toISOString(),
       })
       .eq("id", site.id)
@@ -1512,6 +1560,54 @@ export default function CapturaClient() {
                       </div>
                     )}
                   </div>
+
+                  {isVipPreview && (
+                    <div className="rounded-lg border border-dark-border p-4 space-y-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <span className={labelClass}>Notificações na página</span>
+                          <p className="mt-1 text-xs text-text-secondary/80">
+                            Cartões de “quem entrou” (ou cupom no modelo roleta). Desligue se não quiser.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={notificationsEnabled}
+                          onClick={() => setNotificationsEnabled((v) => !v)}
+                          className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-dark-border transition-colors focus:outline-none focus:ring-2 focus:ring-shopee-orange/50 ${
+                            notificationsEnabled ? "bg-shopee-orange" : "bg-dark-bg"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
+                              notificationsEnabled ? "translate-x-[1.35rem]" : "translate-x-0.5"
+                            } mt-px`}
+                          />
+                        </button>
+                      </div>
+                      {notificationsEnabled && (
+                        <div>
+                          <label className={labelClass}>Posição</label>
+                          <select
+                            value={notificationsPosition}
+                            onChange={(e) =>
+                              setNotificationsPosition(
+                                normalizeNotificationsPosition(e.target.value),
+                              )
+                            }
+                            className={inputClass}
+                          >
+                            {NOTIFICATIONS_POSITION_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1520,12 +1616,15 @@ export default function CapturaClient() {
                 <div className="text-xs text-text-secondary">{step} de 3</div>
 
                 <div className="flex items-center gap-2">
-                  {step > 1 && (
+                  {(step > 1 || (step === 1 && mode === "create")) && (
                     <button
                       type="button"
-                      onClick={goPrevStep}
+                      onClick={() => {
+                        if (step > 1) goPrevStep();
+                        else backToTemplatePicker();
+                      }}
                       className="h-9 px-3 rounded-md bg-dark-bg border border-dark-border text-text-secondary hover:text-text-primary hover:border-dark-border/80 transition-colors inline-flex items-center gap-2"
-                      title="Voltar"
+                      title={step === 1 && mode === "create" ? "Escolher outro modelo" : "Voltar"}
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Voltar
@@ -1577,33 +1676,67 @@ export default function CapturaClient() {
                   <div className="text-sm font-semibold text-text-primary">Preview (modelo VIP)</div>
                   <div className="text-xs text-text-secondary">Tempo real</div>
                 </div>
-                <div className="p-3 bg-dark-bg max-h-[min(78vh,820px)] overflow-y-auto scrollbar-thin">
-                  <div className="origin-top scale-[0.72] sm:scale-[0.78] mx-auto w-[min(100%,420px)]">
-                    <CaptureVipLanding
-                      variant={
-                        pageTemplate === "vip_terroso"
-                          ? "vip_terroso"
-                          : pageTemplate === "vinho_rose"
-                            ? "vinho_rose"
-                            : pageTemplate === "the_new_chance"
-                              ? "the_new_chance"
-                              : pageTemplate === "aurora_ledger"
-                                ? "aurora_ledger"
-                                : pageTemplate === "jardim_floral"
-                                  ? "jardim_floral"
-                                  : "vip_rosa"
-                      }
-                      title={previewTitle}
-                      description={previewDesc}
-                      buttonText={previewButtonText}
-                      ctaHref={previewButtonUrl.trim() ? previewButtonUrl : "#"}
-                      logoUrl={previewLogoSrc}
-                      buttonColor={previewColor}
-                      youtubeUrl={youtubeUrl.trim() || null}
-                      previewMode
-                    />
+                <CapturePreviewPortalContext.Provider value={{ root: vipPreviewToastRoot }}>
+                  <div className="relative flex h-[min(78vh,820px)] max-h-[min(78vh,820px)] flex-col overflow-hidden bg-black/30">
+                    <div className="flex min-h-0 flex-1 items-center justify-center p-3 sm:p-4">
+                      <div
+                        className="relative mx-auto h-full max-h-full w-auto max-w-[min(100%,320px)] shrink-0"
+                        style={{ aspectRatio: `${VIP_PREVIEW_MOCKUP.w} / ${VIP_PREVIEW_MOCKUP.h}` }}
+                      >
+                        {/* Conteúdo da página “dentro” da tela (por baixo do PNG transparente) */}
+                        <div
+                          className="absolute z-[1] overflow-hidden rounded-[3.05rem] sm:rounded-[3.2rem]"
+                          style={VIP_PREVIEW_MOCKUP.screen}
+                        >
+                          <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                            <CaptureVipLanding
+                              variant={
+                                pageTemplate === "vip_terroso"
+                                  ? "vip_terroso"
+                                  : pageTemplate === "vinho_rose"
+                                    ? "vinho_rose"
+                                    : pageTemplate === "the_new_chance"
+                                      ? "the_new_chance"
+                                      : pageTemplate === "aurora_ledger"
+                                        ? "aurora_ledger"
+                                        : pageTemplate === "jardim_floral"
+                                          ? "jardim_floral"
+                                          : "vip_rosa"
+                              }
+                              title={previewTitle}
+                              description={previewDesc}
+                              buttonText={previewButtonText}
+                              ctaHref={previewButtonUrl.trim() ? previewButtonUrl : "#"}
+                              logoUrl={previewLogoSrc}
+                              buttonColor={previewColor}
+                              youtubeUrl={youtubeUrl.trim() || null}
+                              previewMode
+                              notificationsEnabled={notificationsEnabled}
+                              notificationsPosition={notificationsPosition}
+                            />
+                          </div>
+                        </div>
+                        {/* Toasts só na área da tela (canto do ecrã, não da moldura) */}
+                        <div
+                          ref={setVipPreviewToastRoot}
+                          className="pointer-events-none absolute z-[40]"
+                          style={VIP_PREVIEW_MOCKUP.screen}
+                          aria-hidden
+                        />
+                        {/* Moldura por cima (z maior); centro transparente mostra conteúdo + toasts por baixo */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={VIP_PREVIEW_MOCKUP.src}
+                          alt=""
+                          width={VIP_PREVIEW_MOCKUP.w}
+                          height={VIP_PREVIEW_MOCKUP.h}
+                          className="pointer-events-none absolute inset-0 z-[50] h-full w-full select-none object-contain"
+                          draggable={false}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </CapturePreviewPortalContext.Provider>
               </div>
             ) : (
               <CapturePreviewCard

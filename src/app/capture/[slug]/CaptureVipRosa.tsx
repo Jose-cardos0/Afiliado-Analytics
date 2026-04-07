@@ -16,6 +16,12 @@ import { parseColorToRgb } from "@/app/(main)/dashboard/captura/_lib/captureUtil
 import { isWhatsAppUrl, useCaptureVipFonts } from "./capture-vip-shared";
 import CaptureVipEntradaToasts from "./CaptureVipEntradaToasts";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
+import {
+  CAPTURE_BODY,
+  CAPTURE_CTA_CLASS,
+  CAPTURE_CTA_LABEL,
+  CAPTURE_TITLE_HERO,
+} from "./capture-responsive-classes";
 
 const BENEFITS: { Icon: typeof Ticket; title: string; body: string }[] = [
   {
@@ -104,7 +110,12 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
     buttonColor,
     youtubeUrl,
     previewMode = false,
+    notificationsEnabled,
+    notificationsPosition,
   } = props;
+
+  const notifOn = notificationsEnabled !== false;
+  const notifPos = notificationsPosition ?? "top_right";
 
   const safeTitle = title.trim() || "Grupo VIP";
   const safeDesc =
@@ -123,7 +134,6 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
   useCaptureVipFonts();
 
   useEffect(() => {
-    if (previewMode) return;
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
@@ -131,15 +141,15 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
       setEleganteFilledPct((p) => Math.min(100, p + 1));
     }, 5000);
     return () => clearInterval(t);
-  }, [previewMode]);
+  }, []);
 
   const theme = VIP_ROSA_THEME;
-  const rosaPct = previewMode ? 70 : eleganteFilledPct;
+  const rosaPct = eleganteFilledPct;
   const rosaSpotsRemaining = Math.max(0, Math.round((TOTAL_SPOTS * (100 - rosaPct)) / 100));
 
   return (
     <>
-      <CaptureVipEntradaToasts />
+      <CaptureVipEntradaToasts disabled={!notifOn} position={notifPos} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -229,7 +239,7 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
           </div>
 
           <h1
-            className="mb-2.5 text-2xl leading-snug md:text-[26px] font-bold"
+            className={`mb-2.5 ${CAPTURE_TITLE_HERO} font-bold`}
             style={{
               fontFamily: theme.headingFont,
               color: theme.textMain,
@@ -238,7 +248,10 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
             {safeTitle}
           </h1>
 
-          <p className="mb-3.5 px-0.5 text-sm font-normal leading-relaxed" style={{ color: theme.textSoft }}>
+          <p
+            className={`mb-3.5 px-0.5 ${CAPTURE_BODY} font-normal`}
+            style={{ color: theme.textSoft }}
+          >
             {safeDesc}
           </p>
 
@@ -251,7 +264,7 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
           <div className="my-2">
             <a
               href={ctaHref}
-              className="relative isolate flex w-full items-center justify-center overflow-hidden py-4 text-base font-black uppercase tracking-wide text-white no-underline shadow-lg transition-transform hover:-translate-y-0.5"
+              className={`relative isolate ${CAPTURE_CTA_CLASS} uppercase font-black tracking-wide overflow-hidden shadow-lg transition-transform hover:-translate-y-0.5`}
               style={{
                 borderRadius: theme.ctaRadius,
                 backgroundColor: color,
@@ -259,9 +272,9 @@ export default function CaptureVipRosa(props: CaptureVipLandingProps) {
               }}
             >
               <span className="capture-vip-rosa-cta-sheen" aria-hidden />
-              <span className="relative z-[1] flex items-center justify-center">
-                {showWa ? <FaWhatsapp className="mr-2.5 text-xl" aria-hidden /> : null}
-                {safeBtn}
+              <span className="relative z-[1] flex min-w-0 flex-1 items-center justify-center gap-2 px-1">
+                {showWa ? <FaWhatsapp className="text-xl shrink-0" aria-hidden /> : null}
+                <span className={CAPTURE_CTA_LABEL}>{safeBtn}</span>
               </span>
             </a>
             <p className="mt-2.5 text-xs font-extrabold" style={{ color: theme.deep }}>

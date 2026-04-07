@@ -1,3 +1,5 @@
+import type { NotificationsPosition } from "@/lib/capture-notifications";
+
 /** Props partilhadas pelos templates VIP (rosa + terroso). */
 export type CaptureVipLandingProps = {
   title: string;
@@ -11,4 +13,8 @@ export type CaptureVipLandingProps = {
   youtubeUrl?: string | null;
   /** Desliga animação de vagas (preview no dashboard) */
   previewMode?: boolean;
+  /** Notificações fictícias na página (default true). */
+  notificationsEnabled?: boolean;
+  /** Onde o cartão de notificação aparece (default topo). */
+  notificationsPosition?: NotificationsPosition;
 };

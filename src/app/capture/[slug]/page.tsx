@@ -8,10 +8,15 @@ import { Tag, Zap, Gift, Lock } from "lucide-react"; // ✅ REMOVIDO MessageCirc
 import ScarcityBlock from "./ScarcityBlock";
 import { detectBot } from "../../../lib/bot-detection";
 import CTAButton from "./CTAButton";
+import { CAPTURE_BODY, CAPTURE_TITLE_HERO } from "./capture-responsive-classes";
 import CaptureVipLanding from "./CaptureVipLanding";
 import CaptureYoutubeEmbed from "./CaptureYoutubeEmbed";
 import type { PageTemplate } from "@/app/(main)/dashboard/captura/_lib/types";
 import { normalizeCapturePageTemplate } from "@/lib/capture-page-template";
+import {
+  normalizeNotificationsEnabled,
+  normalizeNotificationsPosition,
+} from "@/lib/capture-notifications";
 import { CAPTURE_PUBLIC_DOMAIN, loadCaptureSiteRow } from "@/lib/capture-load-site";
 
 export const dynamic = "force-dynamic";
@@ -251,6 +256,9 @@ export default async function CapturePage(props: { params: Promise<{ slug: strin
     pageTemplate === "jardim_floral";
   const youtubeUrl = (site.youtube_url ?? "").trim();
 
+  const notificationsEnabled = normalizeNotificationsEnabled(site.notifications_enabled);
+  const notificationsPosition = normalizeNotificationsPosition(site.notifications_position);
+
   return (
     <>
       {/* Injeção do Meta Pixel (se existir) */}
@@ -295,6 +303,8 @@ export default async function CapturePage(props: { params: Promise<{ slug: strin
           logoUrl={logoUrl}
           buttonColor={buttonColor}
           youtubeUrl={youtubeUrl || null}
+          notificationsEnabled={notificationsEnabled}
+          notificationsPosition={notificationsPosition}
         />
       ) : null}
 
@@ -371,16 +381,13 @@ export default async function CapturePage(props: { params: Promise<{ slug: strin
               </div>
             )}
 
-            <h1
-              className="text-center font-extrabold leading-tight"
-              style={{ color: "rgb(31, 31, 31)", fontSize: "32px" }}
-            >
+            <h1 className={CAPTURE_TITLE_HERO} style={{ color: "rgb(31, 31, 31)" }}>
               {title}
             </h1>
 
             <p
-              className="text-center mt-4 leading-snug max-w-sm mx-auto font-semibold"
-              style={{ color: "rgb(60, 60, 60)", fontSize: "17px" }}
+              className={`${CAPTURE_BODY} mt-4 max-w-sm mx-auto font-semibold`}
+              style={{ color: "rgb(60, 60, 60)" }}
             >
               {desc}
             </p>
