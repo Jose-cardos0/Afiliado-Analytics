@@ -26,15 +26,32 @@ export default async function RenewPage({
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('subscription_status')
+    .select('subscription_status, plan_tier, trial_access_until')
     .eq('id', user.id)
     .single()
 
-  if (!error && profile?.subscription_status === 'active' && !precisaPlano) {
+  const trialUntil = profile?.trial_access_until
+    ? new Date(profile.trial_access_until as string).getTime()
+    : 0
+  const trialExpired =
+    profile?.plan_tier === 'trial' &&
+    trialUntil > 0 &&
+    trialUntil < Date.now()
+
+  // Igual ao `dashboard/page.tsx`: com trial expirado não pode mandar de volta ao dashboard
+  // só porque `subscription_status` ainda é `active` (cron ainda não pôs `canceled`).
+  if (
+    !error &&
+    profile?.subscription_status === 'active' &&
+    !precisaPlano &&
+    !trialExpired
+  ) {
     redirect('/dashboard')
   }
 
-  const upgradeMode = Boolean(!error && profile?.subscription_status === 'active' && precisaPlano)
+  const upgradeMode = Boolean(
+    !error && profile?.subscription_status === 'active' && precisaPlano
+  )
 
   return (
     <div className="bg-dark-bg min-h-screen flex flex-col items-center justify-center font-sans p-4">
