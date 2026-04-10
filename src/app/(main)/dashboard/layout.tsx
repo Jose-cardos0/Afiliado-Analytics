@@ -96,6 +96,12 @@ const sidebarNavItems: NavItem[] = [
     icon: <ShoppingBag className="h-5 w-5" />,
   },
   {
+    title: "Gerador de Links ML",
+    href: "/dashboard/minha-lista-ofertas-ml",
+    icon: <ShoppingBag className="h-5 w-5 text-amber-400" />,
+    hidden: false,
+  },
+  {
     title: "Automação de Grupos",
     href: "/dashboard/grupos-venda",
     icon: <MessageCircle className="h-5 w-5" />,
@@ -112,12 +118,7 @@ const sidebarNavItems: NavItem[] = [
     href: "/dashboard/minha-lista-ofertas",
     icon: <ListChecks className="h-5 w-5" />,
   },
-  {
-    title: "Lista de Ofertas - ML",
-    href: "/dashboard/minha-lista-ofertas-ml",
-    icon: <ListChecks className="h-5 w-5 text-amber-400" />,
-    hidden: false,
-  },
+
   {
     title: "Gerador de Criativos",
     href: "/dashboard/video-editor",
