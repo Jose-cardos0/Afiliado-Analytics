@@ -71,16 +71,9 @@ function dedupeByLink(items: MlSiteSearchProduct[]): MlSiteSearchProduct[] {
   return out;
 }
 
-/** Título gerado só para permalink solto no HTML — não é produto listável (evita cards "Anúncio MLB…"). */
-function isMlSyntheticSerpTitle(name: string): boolean {
-  const n = name.trim();
-  return /^Anúncio\s+MLB\d/i.test(n) || /^Produto\s+MLB\d+$/i.test(n);
-}
-
 function pushProduct(sink: MlSiteSearchProduct[], limit: number, p: MlSiteSearchProduct): void {
   if (sink.length >= limit) return;
   if (!p.productLink || !p.productName) return;
-  if (isMlSyntheticSerpTitle(p.productName)) return;
   sink.push(p);
 }
 
@@ -88,7 +81,7 @@ function pushProduct(sink: MlSiteSearchProduct[], limit: number, p: MlSiteSearch
 function scoreListingProduct(p: MlSiteSearchProduct): number {
   let s = 0;
   const name = p.productName.trim();
-  if (name && !isMlSyntheticSerpTitle(name)) s += 4;
+  if (name && !/^Anúncio\s+MLB/i.test(name) && !/^Produto\s+MLB/i.test(name)) s += 4;
   else if (name) s += 1;
   if (p.imageUrl?.trim()) s += 2;
   if (p.price != null) s += 2;
@@ -140,35 +133,11 @@ export function isMlSocialListsProfileUrl(url: string): boolean {
   }
 }
 
-/** Na busca por palavra o HTML traz muito JSON/hidratação com links de perfil social — remove antes do parse. */
-function sanitizeMlSerpHtml(html: string): string {
-  let h = html;
-  const jsonEscapedSocial = new RegExp(
-    String.raw`https:\/\/www\.mercadolivre\.com\.br\/social\/[^"]+`,
-    "gi",
-  );
-  const literalSocial = new RegExp(
-    String.raw`https://www\.mercadolivre\.com\.br/social/[^\s"'<>]+`,
-    "gi",
-  );
-  h = h.replace(jsonEscapedSocial, "");
-  h = h.replace(literalSocial, "");
-  return h;
-}
-
 function filterMlSearchNoiseProducts(items: MlSiteSearchProduct[]): MlSiteSearchProduct[] {
   const out: MlSiteSearchProduct[] = [];
   for (const p of items) {
     const rawLink = p.productLink.split("#")[0];
     const base = decodeMlUrlForParsing(rawLink);
-    if (isMlSocialListsProfileUrl(base)) {
-      const id = p.itemId.trim().toUpperCase();
-      const short = buildProdutoMercadolivreShortUrl(id);
-      if (short && /^MLB\d{6,}$/i.test(id)) {
-        out.push({ ...p, productLink: short });
-      }
-      continue;
-    }
     out.push(base !== rawLink ? { ...p, productLink: base } : p);
   }
   return out;
@@ -190,7 +159,6 @@ function collectFromItemList(obj: unknown, sink: MlSiteSearchProduct[], limit: n
     const url = decodeMlUrlForParsing(String(e.url ?? item.url ?? "").trim().replace(/\\u002F/gi, "/"));
     const name = String(e.name ?? item.name ?? "").trim();
     if (!url.includes("mercadolivre") && !url.includes("mercadolibre")) continue;
-    if (isMlSocialListsProfileUrl(url)) continue;
     if (!name) continue;
 
     let imageUrl = "";
@@ -273,7 +241,6 @@ function parseEmbeddedPermalinks(html: string, limit: number): MlSiteSearchProdu
   while ((m = re.exec(html)) !== null && out.length < limit) {
     const link = m[1].replace(/\\u002f/gi, "/").replace(/\\\//g, "/");
     if (!link.includes("mercadolivre") && !link.includes("mercadolibre")) continue;
-    if (isMlSocialListsProfileUrl(link)) continue;
     const key = link.split("#")[0].split("?")[0].toLowerCase();
     if (seen.has(key)) continue;
     const id = extractMlbIdFromUrl(link);
@@ -303,7 +270,6 @@ function parseMercadoLivreUrlsWithMlb(html: string, limit: number): MlSiteSearch
   while ((m = re.exec(html)) !== null && out.length < limit) {
     let link = m[0].replace(/&amp;/gi, "&");
     link = link.replace(/[,;)\]}>'`]+$/, "");
-    if (isMlSocialListsProfileUrl(link)) continue;
     const id = extractMlbIdFromUrl(link);
     if (!id || !/^MLB/i.test(id)) continue;
     const key = link.split("#")[0].split("?")[0].toLowerCase();
@@ -332,7 +298,6 @@ function parseListingAnchors(html: string, limit: number): MlSiteSearchProduct[]
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null && out.length < limit) {
     const href = m[1].split("#")[0];
-    if (isMlSocialListsProfileUrl(href)) continue;
     const key = href.toLowerCase();
     if (seen.has(key)) continue;
     const id = extractMlbIdFromUrl(href);
@@ -354,14 +319,13 @@ function parseListingAnchors(html: string, limit: number): MlSiteSearchProduct[]
 }
 
 function mergeParseResults(html: string, limit: number): MlSiteSearchProduct[] {
-  const scrubbed = sanitizeMlSerpHtml(html);
   const gather = Math.min(120, Math.max(limit * 4, limit + 12));
   const merged = mergeListingSources(
     [
-      parseLdJsonBlocks(scrubbed, gather),
-      parseListingAnchors(scrubbed, gather),
-      parseEmbeddedPermalinks(scrubbed, gather),
-      parseMercadoLivreUrlsWithMlb(scrubbed, gather),
+      parseLdJsonBlocks(html, gather),
+      parseListingAnchors(html, gather),
+      parseEmbeddedPermalinks(html, gather),
+      parseMercadoLivreUrlsWithMlb(html, gather),
     ],
     gather,
   );
@@ -370,7 +334,7 @@ function mergeParseResults(html: string, limit: number): MlSiteSearchProduct[] {
 
 function needsPdpEnrich(p: MlSiteSearchProduct): boolean {
   const name = p.productName.trim();
-  if (isMlSyntheticSerpTitle(name)) return true;
+  if (/^Anúncio\s+MLB/i.test(name) || /^Produto\s+MLB/i.test(name)) return true;
   if (!p.imageUrl?.trim()) return true;
   if (p.price == null) return true;
   return false;
@@ -462,19 +426,9 @@ export async function enrichMlSiteSearchProductsFromPdp(
   return enriched;
 }
 
-/**
- * Remove linhas que não são produto de verdade após o parse/enrich (perfil /social/, placeholders, ficha vazia).
- */
+/** Mantido para compatibilidade de import; a listagem não filtra resultados aqui. */
 export function filterValidMlSiteSearchProducts(products: MlSiteSearchProduct[]): MlSiteSearchProduct[] {
-  return products.filter((p) => {
-    if (isMlSyntheticSerpTitle(p.productName)) return false;
-    const base = decodeMlUrlForParsing(p.productLink.split("#")[0]);
-    if (isMlSocialListsProfileUrl(base)) return false;
-    const hasImage = !!p.imageUrl?.trim();
-    const hasPrice = p.price != null;
-    if (!hasImage && !hasPrice) return false;
-    return true;
-  });
+  return products;
 }
 
 function categoryListingUrls(categorySlug: string): string[] {
@@ -522,8 +476,7 @@ export async function fetchMlSiteCategoryWithSession(
       const items = mergeParseResults(html, lim);
       if (items.length) {
         const enriched = await enrichMlSiteSearchProductsFromPdp(items, cookieHeader);
-        const valid = filterValidMlSiteSearchProducts(enriched);
-        if (valid.length) return valid;
+        return enriched.slice(0, lim);
       }
     } catch (e) {
       lastMessage = e instanceof Error ? e.message : String(e);
@@ -570,8 +523,7 @@ export async function fetchMlSiteSearchWithSession(
       const items = mergeParseResults(html, lim);
       if (items.length) {
         const enriched = await enrichMlSiteSearchProductsFromPdp(items, cookieHeader);
-        const valid = filterValidMlSiteSearchProducts(enriched);
-        if (valid.length) return valid;
+        return enriched.slice(0, lim);
       }
     } catch (e) {
       lastMessage = e instanceof Error ? e.message : String(e);

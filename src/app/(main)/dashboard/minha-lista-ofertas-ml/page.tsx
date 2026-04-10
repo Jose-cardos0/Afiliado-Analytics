@@ -80,6 +80,11 @@ function fmtMlDisc(r: number) {
   return `${Math.round(r)}% OFF`;
 }
 
+/** Títulos placeholder do SERP (ex.: "Anúncio MLB123") — não listar no painel de resultados. */
+function isMlAnuncioPlaceholderTitle(productName: string): boolean {
+  return /^Anúncio\b/i.test(productName.trim());
+}
+
 /** Primeiras palavras do título para buscar ofertas semelhantes no ML. */
 function mlSimilarSearchQueryFromProductName(name: string): string {
   const parts = name
@@ -165,25 +170,27 @@ function MlOfferRowCard({
       <div
         className={cn(
           "flex items-start justify-between gap-3 shrink-0 min-[420px]:items-center min-[420px]:justify-start",
+          !hasComm && "justify-end min-[420px]:justify-end",
           compact
             ? "w-full pl-[52px] pt-2 mt-1 border-t border-[#2c2c32] min-[420px]:w-auto min-[420px]:pl-0 min-[420px]:pt-0 min-[420px]:mt-0 min-[420px]:border-t-0"
             : "w-full pl-[60px] min-[360px]:pl-[68px] pt-2 mt-1 border-t border-[#2c2c32] min-[420px]:w-auto min-[420px]:pl-0 min-[420px]:pt-0 min-[420px]:mt-0 min-[420px]:border-t-0",
         )}
       >
-        <div className="text-left min-[420px]:text-right">
-          <p
-            className={cn(
-              "font-bold leading-none",
-              hasComm ? "text-emerald-400" : "text-emerald-400/35",
-              compact ? "text-[13px]" : "text-[15px] min-[360px]:text-sm",
-            )}
-          >
-            {hasComm ? formatCurrency(commEst) : "—"}
-          </p>
-          <p className={cn("text-[#bebebe] mt-2", compact ? "text-[9px]" : "text-[10px]")}>
-            {hasComm ? `${pct!.toFixed(1)}% comissão` : "Ganhos ML"}
-          </p>
-        </div>
+        {hasComm ? (
+          <div className="text-left min-[420px]:text-right">
+            <p
+              className={cn(
+                "font-bold leading-none text-emerald-400",
+                compact ? "text-[13px]" : "text-[15px] min-[360px]:text-sm",
+              )}
+            >
+              {formatCurrency(commEst)}
+            </p>
+            <p className={cn("text-[#bebebe] mt-2", compact ? "text-[9px]" : "text-[10px]")}>
+              {`${pct!.toFixed(1)}% comissão`}
+            </p>
+          </div>
+        ) : null}
         <ExternalLink
           className={cn(
             "text-[#e24c30] shrink-0 opacity-100 min-[420px]:opacity-50 min-[420px]:group-hover:opacity-100 transition-opacity mt-0.5 min-[420px]:mt-0",
@@ -671,15 +678,25 @@ export default function MinhaListaOfertasMlPage() {
     void loadLinksInMlOfferList();
   }, [loadLinksInMlOfferList]);
 
-  const mlSearchTotalPages = Math.max(1, Math.ceil(mlSearchResults.length / ML_SEARCH_PAGE_SIZE));
+  const mlSearchResultsVisible = useMemo(
+    () => mlSearchResults.filter((p) => !isMlAnuncioPlaceholderTitle(p.productName)),
+    [mlSearchResults],
+  );
+
+  const mlSearchTotalPages = Math.max(1, Math.ceil(mlSearchResultsVisible.length / ML_SEARCH_PAGE_SIZE));
   const pagedMlSearchResults = useMemo(() => {
     const from = (mlSearchPage - 1) * ML_SEARCH_PAGE_SIZE;
-    return mlSearchResults.slice(from, from + ML_SEARCH_PAGE_SIZE);
-  }, [mlSearchResults, mlSearchPage]);
+    return mlSearchResultsVisible.slice(from, from + ML_SEARCH_PAGE_SIZE);
+  }, [mlSearchResultsVisible, mlSearchPage]);
 
   useEffect(() => {
     setMlSearchPage(1);
-  }, [mlSearchResults.length]);
+  }, [mlSearchResults]);
+
+  useEffect(() => {
+    const tp = Math.max(1, Math.ceil(mlSearchResultsVisible.length / ML_SEARCH_PAGE_SIZE));
+    setMlSearchPage((p) => Math.min(p, tp));
+  }, [mlSearchResultsVisible.length]);
 
   const mlGoldenSimilarTotalPages = Math.max(1, Math.ceil(mlSimilarProducts.length / ML_SIMILAR_PAGE_SIZE));
   const pagedMlGoldenSimilar = useMemo(() => {
@@ -1627,7 +1644,7 @@ export default function MinhaListaOfertasMlPage() {
         </p>
       </nav>
 
-      <div className="flex items-start border-b border-[#2c2c32]">
+      <div className="flex items-stretch border-b border-[#2c2c32]">
         <aside
           className={cn(
             "w-full lg:w-60 lg:shrink-0 border-r border-[#2c2c32] bg-[#27272a] flex flex-col min-w-0 min-h-0",
@@ -1784,12 +1801,12 @@ export default function MinhaListaOfertasMlPage() {
                 mlSearchFocusMode
               }
               label={
-                mlSearchResults.length > 0 && !(selectedMlProduct && mlSearchFocusMode)
+                mlSearchResultsVisible.length > 0 && !(selectedMlProduct && mlSearchFocusMode)
                   ? "Resultados da Busca"
                   : "Produto"
               }
               tooltip={
-                mlSearchResults.length > 0 && !(selectedMlProduct && mlSearchFocusMode)
+                mlSearchResultsVisible.length > 0 && !(selectedMlProduct && mlSearchFocusMode)
                   ? "Resultados da pesquisa. Clique em um produto para selecioná-lo."
                   : "Resultados da busca ou da categoria. Toque em um item para ver ofertas semelhantes; use Converter na barra lateral."
               }
@@ -1807,9 +1824,9 @@ export default function MinhaListaOfertasMlPage() {
           </div>
 
           {mlSearchLoading && mlSearchResults.length === 0 && !selectedMlProduct && !mlSearchFocusMode ? (
-            <div className="flex items-center gap-2 px-4 pt-8 pb-4 text-[#a0a0a0] text-sm w-full min-w-0">
-              <Loader2 className="w-5 h-5 animate-spin text-[#e24c30] shrink-0" aria-hidden />
-              Buscando…
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-16 w-full min-w-0 min-h-[min(70vh,560px)] text-[#a0a0a0] text-sm">
+              <Loader2 className="w-6 h-6 animate-spin text-[#e24c30] shrink-0" aria-hidden />
+              <span>Buscando…</span>
             </div>
           ) : null}
 
@@ -1830,7 +1847,19 @@ export default function MinhaListaOfertasMlPage() {
             </div>
           ) : null}
 
-          {(mlSearchResults.length > 0 ||
+          {!mlSearchLoading &&
+          mlSearchResults.length > 0 &&
+          mlSearchResultsVisible.length === 0 &&
+          !selectedMlProduct &&
+          !mlSearchFocusMode ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-12 w-full min-w-0 min-h-[min(50vh,400px)] text-center">
+              <p className="text-sm text-[#d2d2d2] max-w-xs">
+                Nenhum resultado para exibir: ocultamos itens cujo título começa por Anúncio (placeholder do ML).
+              </p>
+            </div>
+          ) : null}
+
+          {(mlSearchResultsVisible.length > 0 ||
             (selectedMlProduct && mlSearchFocusMode) ||
             (selectedMlProduct && !mlSearchFocusMode)) ? (
             <>
@@ -1839,13 +1868,13 @@ export default function MinhaListaOfertasMlPage() {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] text-[#9a9aa2]">Produto em destaque</p>
-                {mlSearchResults.length > 0 ? (
+                {mlSearchResultsVisible.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => setMlSearchFocusMode(false)}
                     className="text-[10px] font-semibold text-[#e24c30] hover:underline"
                   >
-                    Voltar aos {mlSearchResults.length} resultado(s)
+                    Voltar aos {mlSearchResultsVisible.length} resultado(s)
                   </button>
                 ) : null}
               </div>
@@ -1915,11 +1944,11 @@ export default function MinhaListaOfertasMlPage() {
             </div>
           ) : null}
 
-          {!mlSearchLoading && mlSearchResults.length > 0 && !(selectedMlProduct && mlSearchFocusMode) ? (
+          {!mlSearchLoading && mlSearchResultsVisible.length > 0 && !(selectedMlProduct && mlSearchFocusMode) ? (
             <div className="px-4 pb-4 pt-0 flex flex-col gap-2 w-full min-w-0">
               <p className="text-[10px] text-[#a0a0a0] px-0.5 pt-1">
-                {mlSearchResults.length} produto{mlSearchResults.length !== 1 ? "s" : ""} encontrado
-                {mlSearchResults.length !== 1 ? "s" : ""} - clique para selecionar
+                {mlSearchResultsVisible.length} produto{mlSearchResultsVisible.length !== 1 ? "s" : ""} encontrado
+                {mlSearchResultsVisible.length !== 1 ? "s" : ""} - clique para selecionar
               </p>
               {pagedMlSearchResults.map((p) => {
                 const sel =
